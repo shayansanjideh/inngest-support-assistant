@@ -1,0 +1,546 @@
+[
+ {
+  "source": "inngest/inngest#2079",
+  "url": "https://github.com/inngest/inngest/issues/2079",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly guesses the error is an HTTP body size limit outside the UI and mentions a Next.js route body limit as one possibility. It never commits to Next.js being the source and omits the actual fix of raising the Next.js API route's response size limit.",
+   "confidence": 0.15,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly suspects a framework body-size limit (it mentions Next.js) and suggests raising it, which matches the maintainer's fix. But it hedges between the dev server, the SDK and frameworks, never firmly says the error comes from Next.js, and its only concrete fix example is for Express.",
+   "confidence": 0.3
+  }
+ },
+ {
+  "source": "inngest/inngest#2756",
+  "url": "https://github.com/inngest/inngest/issues/2756",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same resolution as the maintainer: the key has to be hex, the error is caused by the format and not by env reading, and `openssl rand -hex 32` generates a valid key. It adds only hedged caveats and makes no wrong claims.",
+   "confidence": 0.6,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same diagnosis as the maintainer (non-hex signing keys are now intentionally rejected) and the same fix (generate a hex key, e.g. `openssl rand -hex 32`), with no contradicting claims; its hedges on the version boundary and event key are reasonable.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest#1568",
+  "url": "https://github.com/inngest/inngest/issues/1568",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly calls this a Node TLS socket timeout from an outbound request, but it pins it on npx/npm fetching the CLI, while the maintainer says it's the user's own step or downstream request timing out, so the key diagnosis differs.",
+   "confidence": 0.2,
+   "citations": 1
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly calls this a Node-side TLS socket timeout from an outbound call in the user's app rather than an Inngest problem, but it points at startup fetches, network issues, stale ports and CLI upgrades instead of the maintainer's explanation: a slow or hanging downstream request inside the user's steps.",
+   "confidence": 0.3
+  }
+ },
+ {
+  "source": "inngest/inngest#1315",
+  "url": "https://github.com/inngest/inngest/issues/1315",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says to compose two `step.waitForEvent` promises, and with equal timeouts its `Promise.race` gets close, but it misses the maintainer's key fix: a `waitForAny` helper that resolves on the first truthy result and returns null only after all settle, which handles differing timeouts without waiting for both.",
+   "confidence": 0.45,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it combines two `step.waitForEvent` promises into one wait, and setting both to the longer timeout meets the user's requirements (first event wins, otherwise null), even though it uses `Promise.race` instead of the maintainer's `waitForAny` helper that skips null results.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest#628",
+  "url": "https://github.com/inngest/inngest/issues/628",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate only guesses that Bun may skip the postinstall step, and flags this as unverified. It never states the maintainer's explanation that Bun runs postinstall only for `trustedDependencies` and that `bun x` cannot trust a package, nor that no fix exists yet; its npx workaround is reasonable but not the resolution.",
+   "confidence": 0.15,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly guesses that a skipped postinstall script is the likely cause, but it hedges, misses that Bun only runs postinstall for trustedDependencies and that `bun x` offers no way to trust a package, and suggests possible regression or older-Bun paths instead of stating there is no fix yet.",
+   "confidence": 0.3
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1113",
+  "url": "https://github.com/inngest/inngest-js/issues/1113",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate reaches the same diagnosis as the maintainer, two copies of Next.js resolving in the monorepo, and gives the same fixes (align versions, hoist to one copy, or force a single version with resolutions/overrides) without relying on any nonexistent Inngest API.",
+   "confidence": 0.6,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate finds the same root cause the maintainer did, two copies of Next.js resolving in the monorepo, and gives the same fixes: align versions, dedupe or hoist, and use overrides or resolutions, with no Inngest API claims that are wrong.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest-js#933",
+  "url": "https://github.com/inngest/inngest-js/issues/933",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses duplicate zod copies and suggests root `overrides` like the maintainer, but it leaves open whether Inngest should loosen the pin and never explains the maintainer's reason it can't: upgrading broke consumers on older zod, and newer zod dropped TypeScript versions Inngest supports, so the change waits for v4.",
+   "confidence": 0.45,
+   "citations": 1
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate gives the maintainer's key workaround (root npm `overrides` to force a single zod version) and correctly diagnoses the duplicate-zod problem, but it opens with 'probably yes' to loosening the range and suggests that upgrading inngest or requesting `^` would help, contradicting the maintainer's point that the `~3.22.3` pin can't be lifted before v4 without breaking consumers.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest-js#846",
+  "url": "https://github.com/inngest/inngest-js/issues/846",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate rightly suggests checking that the appId and functionId match how the target function was registered, which was the real fix, but it never says that `-` is the correct fully qualified format and leaves open whether it is a bug.",
+   "confidence": 0.2,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says the `-` join is how the SDK builds the fully qualified ID and points to mismatched appId/functionId values as the real cause, asking for the same createFunction and client IDs.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#637",
+  "url": "https://github.com/inngest/inngest-js/issues/637",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate suggests trying a newer TypeScript than 5.0.4, which points toward the maintainer's fix, but it frames this as one unconfirmed option among several, attributes the error to SDK type inference instead of a TypeScript bug fixed in 5.1, and leaves out the built-in `runId` handler property.",
+   "confidence": 0.1,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate lists upgrading TypeScript only as a hedged third option and blames Inngest's middleware type design rather than the TypeScript bug fixed in 5.1 (microsoft/TypeScript#52696); it also omits that `runId` is already passed to the function handler.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#304",
+  "url": "https://github.com/inngest/inngest-js/issues/304",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly flags that event data must be JSON and that a Buffer is unsupported, matching the maintainer's reply, but it misses the documented workaround for the ReadableStream error: pass `fetch` from `@remix-run/web-fetch` into `new Inngest({ fetch })` and remove `allowStreaming: \"force\"`. It only speculates about a polyfill conflict.",
+   "confidence": 0.3,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames a Remix/Vercel stream-polyfill mismatch, uses the real `fetch` client option, and advises against putting the Buffer in the event payload. However, its fix passes native `globalThis.fetch` instead of the maintainer's `@remix-run/web-fetch` export, misses removing `allowStreaming: \"force\"`, and frames the Buffer issue as a size and serialization concern rather than event payloads being JSON-only.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#78",
+  "url": "https://github.com/inngest/inngest-js/issues/78",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate recommends the same workaround as the maintainer (passing `fetch` explicitly to the `Inngest` constructor), but it won't confirm the cross-fetch diagnosis and doesn't say that the SDK should auto-bind the global fetch and that a fix was planned, both of which the maintainer stated.",
+   "confidence": 0.3,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same diagnosis (cross-fetch falls back to an XMLHttpRequest polyfill on edge) and the same fix (pass the global fetch explicitly via the constructor's fetch option), and it hedges appropriately that later versions should bind global fetch automatically, which matches the maintainer's plan.",
+   "confidence": 0.35
+  }
+ },
+ {
+  "source": "inngest/inngest-js#144",
+  "url": "https://github.com/inngest/inngest-js/issues/144",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The maintainer's fix is to create an event key and provide it via `INNGEST_EVENT_KEY`, the constructor, or `setEventKey()`, but the candidate never recommends this and instead says the warning means the app isn't in dev mode and suggests `INNGEST_DEV=1`. That is a plausible but different explanation (`INNGEST_DEV` is a real option in later SDKs) that misses the key fix.",
+   "confidence": 0.3,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate correctly explains the 404 probes, but it wrongly says the warning means `inngest.send()` is being called in a loop, whereas the maintainer says it is logged when `new Inngest()` finds no `INNGEST_EVENT_KEY`; it also recommends `INNGEST_DEV=1` instead of the maintainer's fix of creating an event key and supplying it.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #3154",
+  "url": "https://github.com/orgs/inngest/discussions/3154",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says a function can have both cron and event triggers declared together in a triggers array, and its extra claims (10-trigger limit, checking event.name, the scheduled event type) match Inngest's documented behavior; the placement of `triggers` in the config object may depend on SDK version (older versions take the array as the second argument to createFunction).",
+   "confidence": 0.85,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says one function can have both cron and event triggers if each is declared as a separate object in a triggers array, and the extra details (the inngest/scheduled.timer event name, checking event.name, the SDK version caveat) are accurate and flagged for verification.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #639",
+  "url": "https://github.com/orgs/inngest/discussions/639",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate says it can't confirm a priority feature and offers concurrency keys as a partial workaround, but it misses the key fix the maintainer gives (dynamic run `priority` computed from event data such as user tier), though it does correctly suggest checking the docs for a priority feature and makes no false API claims.",
+   "confidence": 0.3,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate points to Inngest's `priority.run` expression computed from event data to put paid users ahead, and its extra details (a -600 to 600 second offset, pairing with concurrency, precomputing usage penalties into event data) match the documented behavior.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1931",
+  "url": "https://github.com/orgs/inngest/discussions/1931",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it recommends `step.waitForEvent` with the other part of the app emitting an event when the DB condition is met; it doesn't explicitly mention matching on an ID via the `if` expression, but its null-on-timeout note and step-based polling fallback are accurate.",
+   "confidence": 0.75,
+   "citations": 4
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it recommends `step.waitForEvent` with a timeout, matched on an ID and resumed by an event the other process emits; `match` is a real option, and the extra step.sleep polling fallback is accurate.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1256",
+  "url": "https://github.com/orgs/inngest/discussions/1256",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly suggests that concurrency limits alone may not keep later events from running while an earlier one retries, but it misses the maintainer's key fix of sequential `step.run` calls in one function or chaining functions, and it defers to a human instead.",
+   "confidence": 0.25,
+   "citations": 4
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says concurrency limits won't hold later runs behind a failed one, but it mostly recommends the keyed concurrency limit of 1 the user already has. It also misses the maintainer's key fix: put the ordered operations in one function as sequential `step.run` calls, or chain functions so each triggers the next.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #586",
+  "url": "https://github.com/orgs/inngest/discussions/586",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate matches the maintainer: top-level code re-runs on each invocation while completed steps are memoized and run once, and its advice to wrap getUser in a step is accurate, though it skips the point that code after the last step runs only once.",
+   "confidence": 0.85,
+   "citations": 4
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate says code outside steps re-runs on every invocation while completed steps are memoized and not re-executed, so `getUser` runs multiple times; its extra advice to wrap the fetch in `step.run` is accurate.",
+   "confidence": 0.9
+  }
+ },
+ {
+  "source": "inngest/inngest#3289",
+  "url": "https://github.com/inngest/inngest/issues/3289",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate says the app must run with the same signing key as `inngest start`, set via `INNGEST_SIGNING_KEY` or the SDK's `signingKey` option, and suggests checking for a mismatch; it hedges heavily but makes no materially wrong claims.",
+   "confidence": 0.15,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly ties the 401 to signing-key handling and adds the INNGEST_DEV=0 and base-URL setup the later reporter confirmed. But it attributes the failure to a prefix/hex format mismatch rather than the maintainer's fix of putting the identical key in the app (via INNGEST_SIGNING_KEY or the SDK option), and it advises different strings on each side, which departs from the maintainer's 'same key' guidance.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest#3069",
+  "url": "https://github.com/inngest/inngest/issues/3069",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly explains that Inngest re-runs the function on each step, so code outside steps repeats, but it never mentions the `logger` from the function input, which is the maintainer's recommended fix; it suggests moving logs and the random value into steps instead.",
+   "confidence": 0.7,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly explains that Inngest re-enters the function on every step and memoizes completed steps, so code outside steps reruns and logs repeat. It never mentions the maintainer's recommended fix, the `logger` from the function input, and offers logging inside `step.run` instead.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest#2216",
+  "url": "https://github.com/inngest/inngest/issues/2216",
+  "withDocs": {
+   "score": 0,
+   "hallucinated_api": false,
+   "why": "The candidate never identifies the hard, non-configurable 2-hour step duration limit as the cause and doesn't recommend splitting the job into checkpointed steps. It suggests checking host timeouts and escalating instead, which leaves the user without the actual explanation or fix.",
+   "confidence": 0.2,
+   "citations": 0
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate suggests splitting the work into shorter steps, which matches the maintainer's recommended fix. It misses the key explanation that a single step has a hard, non-configurable 2-hour limit, so the timeout is expected. It also points the user toward red herrings: retries config and Dev Server differences.",
+   "confidence": 0.3
+  }
+ },
+ {
+  "source": "inngest/inngest#2104",
+  "url": "https://github.com/inngest/inngest/issues/2104",
+  "withDocs": {
+   "score": 0,
+   "hallucinated_api": false,
+   "why": "The candidate misses the actual explanation (rerun-from-step only applies to steps with input, like step.ai.infer and step.ai.wrap) and wrongly suggests the CLI version or an upgrade is the cause, which would mislead the user.",
+   "confidence": 0.2,
+   "citations": 3
+  },
+  "control": {
+   "score": 0,
+   "hallucinated_api": false,
+   "why": "The candidate blames an outdated CLI version and tells the user to upgrade, but the real reason is that re-run from step only exists for step.ai.infer and step.ai.wrap, so the answer would mislead the user even though it hedges and invents no API.",
+   "confidence": 0.3
+  }
+ },
+ {
+  "source": "inngest/inngest#2030",
+  "url": "https://github.com/inngest/inngest/issues/2030",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does give the maintainer's fix (wrap the interpolated value in quotes inside the CEL expression), but it leads with a wrong diagnosis that the user's snippet used plain double quotes and so wasn't interpolated, when the user actually used backticks.",
+   "confidence": 0.7,
+   "citations": 1
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate reaches the maintainer's fix: an interpolated string must be quoted inside the `if` expression. Its extra notes (the `event` vs `async` semantics and `event.data.x == async.data.x` as the equivalent of `match`) are accurate and don't mislead.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest#2016",
+  "url": "https://github.com/inngest/inngest/issues/2016",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly confirms that step.run suits unreliable APIs and offers a workable offload-to-storage workaround, but it misses the key fix: the error comes from the user's HTTP server body-parser limit (e.g., Express's 100kb default) and is resolved by raising it, not by the 4MB Inngest step limit.",
+   "confidence": 0.45,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate traces the error to the user's own server body parser (Express's 100kb default) and fixes it by raising express.json's limit; it doesn't state the 4MB step limit but says nothing wrong about it.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest#1929",
+  "url": "https://github.com/inngest/inngest/issues/1929",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly guesses the SDK is reporting the internal Supabase URL and suggests sensible workarounds (resync override, serve host), but it misses the maintainer's actual fix of setting INNGEST_ALLOW_IN_BAND_SYNC=1.",
+   "confidence": 0.3,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses the SDK advertising Supabase's internal URL and suggests the real `serveOrigin`/`servePath` options (a plausible workaround), but it misses the maintainer's fix of setting `INNGEST_ALLOW_IN_BAND_SYNC=1` to use the in-band sync flow.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest-js#955",
+  "url": "https://github.com/inngest/inngest-js/issues/955",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate makes the same diagnosis and fix as the maintainer: the user imported `createClient` but called `new Inngest`, so they need `import { Inngest } from 'inngest'`. The extra advice is hedged and not materially wrong.",
+   "confidence": 0.6,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate makes the same diagnosis and fix as the maintainer (import `Inngest` instead of `createClient`), and its added troubleshooting points are reasonable and don't contradict the maintainer.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest#1433",
+  "url": "https://github.com/inngest/inngest/issues/1433",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate says the event can arrive before `waitForEvent` is registered, so the wait misses it and times out. Its workarounds match the maintainer's (delaying the event, or handling it in a separate correlated function). It leaves out the planned lookback feature but makes no materially wrong claims.",
+   "confidence": 0.4,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same explanation as the maintainer: the event arrives before waitForEvent registers, so the wait times out. It also offers comparable workarounds (sequence or delay the event, decouple via state or separate function logic) and makes no materially wrong claims; it only omits the planned lookback feature.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest-js#941",
+  "url": "https://github.com/inngest/inngest-js/issues/941",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly treats step calls inside transformInput as unsupported and points toward running steps in the handler, but it misses the maintainer's actual workaround of returning the un-awaited step promise in ctx and awaiting it in the function body.",
+   "confidence": 0.2,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says awaiting `ctx.step` inside `transformInput` hangs and offers a workable alternative (do steps in the handler). However, it wrongly claims step tools aren't usable from the hook at all and misses the maintainer's fix: start the step call as a promise in `transformInput`, return it in `ctx`, and `await` it in the handler.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest-js#801",
+  "url": "https://github.com/inngest/inngest-js/issues/801",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says unmocked step.sleep/waitForEvent must be mocked in @inngest/test and points to the docs' mocking section; its hedges and the executeStep mention are accurate and not misleading.",
+   "confidence": 0.5,
+   "citations": 1
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate's fix matches the maintainer's: mock the sleep step by ID via `execute({ steps: [...] })`. But it wrongly says the hang points to a timer or engine problem rather than expected behavior, when the maintainer says unmocked sleeps hang by design.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/inngest-js#664",
+  "url": "https://github.com/inngest/inngest-js/issues/664",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does suggest tunneling the Dev Server with ngrok and setting INNGEST_DEV to the tunnel URL, but it leads with a less relevant cloud-mode/isDev diagnosis, hedges the tunnel as unconfirmed, and omits the INNGEST_SERVE_HOST override the maintainer says is needed.",
+   "confidence": 0.4,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does suggest tunneling the Dev Server so the remote worker can reach it. But it presents forcing dev mode (`isDev: true`) as the main fix, misses that the worker can't reach localhost during registration, omits `INNGEST_SERVE_HOST`, and wrongly questions the port even though the user passed `--port 3000`.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest-js#490",
+  "url": "https://github.com/inngest/inngest-js/issues/490",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same fix as the maintainer, running inngest-cli@latest because 0.23.1 is too old for SDK >=3.12.0, and its fallback suggestions are reasonable and not wrong.",
+   "confidence": 0.5,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate attributes the error to an outdated pinned inngest-cli and says to run `inngest-cli@latest`; its hedged explanation of the StepRun opcode matches the error message and contradicts nothing the maintainer said.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "source": "inngest/inngest-js#438",
+  "url": "https://github.com/inngest/inngest-js/issues/438",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate recommends the same fix as the maintainer: a separate middleware-free client for sending events from Edge and the full client for serve(). However, it wrongly says middleware only runs during function runs, which contradicts the maintainer's point that client middleware also hooks into inngest.send().",
+   "confidence": 0.3,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it explains that client middleware also hooks `inngest.send()` (via `onSendEvent`) and recommends a separate middleware-free client for Edge sending while keeping the full client for `serve()`; the extra suggestions are hedged and not materially wrong.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest-js#150",
+  "url": "https://github.com/inngest/inngest-js/issues/150",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate matches the maintainer's fix: it explains that the typings use TS 4.7 instantiation expressions, so TS 4.4.3 can't parse them, and that upgrading TypeScript to 4.7+ is the resolution.",
+   "confidence": 0.45,
+   "citations": 1
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, the candidate says Inngest's types (instantiation expressions) and type-fest need TypeScript 4.7, so the fix is to upgrade to 4.7 or later, and it makes no materially wrong claims.",
+   "confidence": 0.8
+  }
+ }
+]

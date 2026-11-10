@@ -1,0 +1,301 @@
+[
+ {
+  "source": "inngest/inngest-js#330",
+  "url": "https://github.com/inngest/inngest-js/issues/330",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate agrees with the maintainer that step-level before/after hooks are the answer, but it says they already exist in v4 (`onStepStart`, `wrapStep`, `wrapStepHandler`, `onStepComplete`) and that this isn't a feature request, which contradicts the maintainer's position that these hooks were only proposed. It also never explains that `beforeExecution` fires when function code starts executing rather than per step.",
+   "confidence": 0.8,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says `beforeExecution` marks function-level execution phases rather than individual steps and carries no upcoming step info, and it points to a new per-step hook like `beforeStepExecution` as the missing piece; its workarounds are hedged and consistent with existing middleware hooks.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate agrees with the maintainer that step-level before/after hooks are the answer, but it says they already exist in v4 (`onStepStart`, `wrapStep`, `wrapStepHandler`, `onStepComplete`) and that this isn't a feature request, which contradicts the maintainer's position that these hooks were only proposed. It also never explains that `beforeExecution` fires when function code starts executing rather than per step.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest-js#331",
+  "url": "https://github.com/inngest/inngest-js/issues/331",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The answer correctly says to pass a `.child()`-capable logger to the client, but it misses the key point that the types don't expose `.child()` inside functions. It also presents middleware-based child logging (`Middleware.BaseMiddleware`, returning `ctx.logger` from `transformInput`) as the supported route, which contradicts the maintainer's statement that `logger` isn't accessible in middleware hooks.",
+   "confidence": 0.55,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate gives a reasonable workaround (using the base logger's child directly or via middleware), but it says the wrapped logger can't support `.child()` and misses the maintainer's point that a child-capable logger passed to the client should already work and only the types need extending; it also wrongly treats the user's patched `DefaultLogger.child` throw as real SDK behavior.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The answer correctly says to pass a `.child()`-capable logger to the client, but it misses the key point that the types don't expose `.child()` inside functions. It also presents middleware-based child logging (`Middleware.BaseMiddleware`, returning `ctx.logger` from `transformInput`) as the supported route, which contradicts the maintainer's statement that `logger` isn't accessible in middleware hooks.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest-js#103",
+  "url": "https://github.com/inngest/inngest-js/issues/103",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate suggests a workable custom-handler approach but misses the key fix: the maintainer said SolidStart support already exists via `npm install inngest@solid`, with an example repo, and the candidate instead doubts that a first-party handler exists.",
+   "confidence": 0.5,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate offers a plausible workaround with the real `inngest/edge` handler at the same `src/routes/api/inngest.ts` path, but it says there is no dedicated SolidStart adapter, which contradicts the maintainer's `npm install inngest@solid` release and example repo, so it misses the key fix.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate suggests a workable custom-handler approach but misses the key fix: the maintainer said SolidStart support already exists via `npm install inngest@solid`, with an example repo, and the candidate instead doubts that a first-party handler exists.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/agent-kit#244",
+  "url": "https://github.com/inngest/agent-kit/issues/244",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly calls it a version incompatibility between agent-kit and inngest, but it misses the key fix (installing the canary agent-kit build from PR #245) and suggests that upgrading to the latest stable or pinning versions would resolve it, which the maintainer indicates is not the case.",
+   "confidence": 0.5,
+   "citations": 0
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames an agent-kit/inngest version incompatibility. It misses the key fix, which is installing the canary @inngest/agent-kit build from PR #245, and instead recommends `@latest` stable versions, which the maintainer indicates did not yet contain the fix.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly calls it a version incompatibility between agent-kit and inngest, but it misses the key fix (installing the canary agent-kit build from PR #245) and suggests that upgrading to the latest stable or pinning versions would resolve it, which the maintainer indicates is not the case.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/agent-kit#77",
+  "url": "https://github.com/inngest/agent-kit/issues/77",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The diagnosis matches the maintainer (agent-kit's CJS build require()s an ESM-only dependency), but the answer misses the key fix of upgrading to @inngest/agent-kit@0.3.1 with dual CJS/ESM builds and says it doesn't know which release fixes it; its main workaround also confuses the user's working agent-kit 0.1.2 with a json-schema-to-zod version to pin.",
+   "confidence": 0.6,
+   "citations": 0
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The answer correctly diagnoses agent-kit's CJS build calling require() on an ESM-only dependency, but it misses the maintainer's fix of upgrading to @inngest/agent-kit@0.3.1, which ships dual CJS/ESM builds. It also offers a shaky workaround that pins @dmitryrechkin/json-schema-to-zod to '0.1.2', a version number that was actually agent-kit's.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The diagnosis matches the maintainer (agent-kit's CJS build require()s an ESM-only dependency), but the answer misses the key fix of upgrading to @inngest/agent-kit@0.3.1 with dual CJS/ESM builds and says it doesn't know which release fixes it; its main workaround also confuses the user's working agent-kit 0.1.2 with a json-schema-to-zod version to pin.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/agent-kit#38",
+  "url": "https://github.com/inngest/agent-kit/issues/38",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The `openai()` helper with a custom `baseUrl` is a real option and a plausible workaround that matches the maintainer's point about config options, but the answer wrongly says AgentKit already supports Ollama, while the maintainer said support would need to be added, and it never asks about network or auth setup.",
+   "confidence": 0.6,
+   "citations": 0
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate offers a plausible workaround: point the OpenAI adapter's baseUrl at Ollama's OpenAI-compatible /v1 endpoint, which fits the maintainer's question about base URL and auth. But it doesn't match the maintainer's actual answer, which said Inngest can add Ollama support and pointed to where the models are defined, and it never asks whether the endpoint is internet-facing or on a closed network.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The `openai()` helper with a custom `baseUrl` is a real option and a plausible workaround that matches the maintainer's point about config options, but the answer wrongly says AgentKit already supports Ollama, while the maintainer said support would need to be added, and it never asks about network or auth setup.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1932",
+  "url": "https://github.com/orgs/inngest/discussions/1932",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says self-hosted Inngest has no built-in dashboard auth and recommends an authenticating reverse proxy in front of the UI, with event/API traffic routed separately, and its other details (ports 8288/8289, --event-key/--signing-key) are accurate; it omits only that auth isn't planned and that contributions are welcome.",
+   "confidence": 0.72,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says self-hosted Inngest has no built-in dashboard auth, recommends putting the UI behind an authenticating reverse proxy, and keeps event/SDK endpoints separate so they stay reachable; the key-based API auth details it adds are accurate.",
+   "confidence": 0.72
+  },
+  "draftOnly": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says self-hosted Inngest has no built-in dashboard auth and recommends an authenticating reverse proxy in front of the UI, with event/API traffic routed separately, and its other details (ports 8288/8289, --event-key/--signing-key) are accurate; it omits only that auth isn't planned and that contributions are welcome.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #3683",
+  "url": "https://github.com/orgs/inngest/discussions/3683",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says concurrency counts executing steps and that Enterprise is an option, but it misses the key point that 100 is only the base included amount and Pro customers can buy add-on concurrency; it instead presents 100 as a hard cap and Enterprise as the main way past it.",
+   "confidence": 0.35,
+   "citations": 4
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate treats 100 as a hard Pro-plan cap that only Enterprise lifts, missing the maintainer's key point that 100 is a base amount and Pro customers can buy more concurrency as an add-on. Its general reasoning (capacity costs, higher tiers raise limits) points in the right direction.",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says concurrency counts executing steps and that Enterprise is an option, but it misses the key point that 100 is only the base included amount and Pro customers can buy add-on concurrency; it instead presents 100 as a hard cap and Enterprise as the main way past it.",
+   "confidence": 0.35
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #3100",
+  "url": "https://github.com/orgs/inngest/discussions/3100",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "It correctly confirms that Promise.race over two waitForEvent calls is the recommended pattern, but it never mentions the suggested waitForAny() helper or the differing-timeout behavior (a shorter timeout resolving the race with null), and its example code wrongly correlates the failure event on data.target instead of the Twilio MessageSid.",
+   "confidence": 0.6,
+   "citations": 5
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate reaches the maintainer's resolution that Promise.race over multiple step.waitForEvent calls is a supported approach, though it omits the user-land waitForAny() optimization and the differing-timeout nuance, and its example changes the failure-event correlation.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "It correctly confirms that Promise.race over two waitForEvent calls is the recommended pattern, but it never mentions the suggested waitForAny() helper or the differing-timeout behavior (a shorter timeout resolving the race with null), and its example code wrongly correlates the failure event on data.target instead of the Twilio MessageSid.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1347",
+  "url": "https://github.com/orgs/inngest/discussions/1347",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate rightly treats this as a reachability problem and mentions middleware or auth blocking the endpoint, but it leads with a wrong diagnosis (missing `express.json()`, which the user already has on `/api/inngest`), focuses on local dev-server issues, and misses the maintainer's key points about deployment protection, `INNGEST_SIGNING_KEY`, and contacting support for logs.",
+   "confidence": 0.55,
+   "citations": 1
+  },
+  "control": {
+   "score": 0,
+   "hallucinated_api": true,
+   "why": "The answer blames a missing express.json() parser that the user already has, and wrongly says the three-argument createFunction form is invalid in v3 or later, contradicting the maintainer's view that the code is correct. It also misses the real suspects: URL or deployment protection blocking Inngest, and INNGEST_SIGNING_KEY.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate rightly treats this as a reachability problem and mentions middleware or auth blocking the endpoint, but it leads with a wrong diagnosis (missing `express.json()`, which the user already has on `/api/inngest`), focuses on local dev-server issues, and misses the maintainer's key points about deployment protection, `INNGEST_SIGNING_KEY`, and contacting support for logs.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #2682",
+  "url": "https://github.com/orgs/inngest/discussions/2682",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate matches the maintainer's main fixes: use Inngest Realtime to push to the browser, or add a final step.run that notifies your own system, plus polling for status. It skips the specific REST API run-status endpoint but makes no materially wrong claims, and it hedges the v4 Realtime helper names.",
+   "confidence": 0.6,
+   "citations": 4
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate gives the same main fixes as the maintainer, Inngest Realtime and a final step.run that writes to a DB or notification system, with no materially wrong claims; it omits the Inngest REST API run-status option but offers equivalent polling of the app's own DB.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate matches the maintainer's main fixes: use Inngest Realtime to push to the browser, or add a final step.run that notifies your own system, plus polling for status. It skips the specific REST API run-status endpoint but makes no materially wrong claims, and it hedges the v4 Realtime helper names.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #783",
+  "url": "https://github.com/orgs/inngest/discussions/783",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says nested step.run isn't supported and fixes it by running the steps sequentially at the top level, the same fix minus the wrapper function; it doesn't mention step.invoke, but it makes no materially wrong claims.",
+   "confidence": 0.8,
+   "citations": 2
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says nested step.run is unsupported and fixes it by calling the steps sequentially at the function level, which is equivalent to the maintainer's plain async grouping function; the quoted error text is hedged and plausible, and it omits step.invoke but that is minor.",
+   "confidence": 0.85
+  },
+  "draftOnly": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says nested step.run isn't supported and fixes it by running the steps sequentially at the top level, the same fix minus the wrapper function; it doesn't mention step.invoke, but it makes no materially wrong claims.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #989",
+  "url": "https://github.com/orgs/inngest/discussions/989",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says to get `ctx.logger` from the `transformInput` hook inside `onFunctionRun` and put it in AsyncLocalStorage. It uses `enterWith` instead of the maintainer's set-in-`beforeExecution`/clear-in-`afterExecution` pattern, which is a minor variation; the extra v4 suggestions are hedged and don't undermine the core fix.",
+   "confidence": 0.55,
+   "citations": 5
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it gets `ctx.logger` from `transformInput()` inside `onFunctionRun` and stores it in AsyncLocalStorage; its extra caveats (`enterWith` limits, wrapping the handler) are reasonable, though it doesn't mention clearing the store in `afterExecution`.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer, it says to get `ctx.logger` from the `transformInput` hook inside `onFunctionRun` and put it in AsyncLocalStorage. It uses `enterWith` instead of the maintainer's set-in-`beforeExecution`/clear-in-`afterExecution` pattern, which is a minor variation; the extra v4 suggestions are hedged and don't undermine the core fix.",
+   "confidence": 0.55
+  }
+ }
+]

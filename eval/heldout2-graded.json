@@ -1,0 +1,462 @@
+[
+ {
+  "source": "inngest/inngest-js#1491",
+  "url": "https://github.com/inngest/inngest-js/issues/1491",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate mentions not overriding baseUrl/INNGEST_BASE_URL, which was the actual fix, but only as a minor last item behind generic env-var advice. It also claims a missing key falls back to NO_EVENT_KEY_SET and produces a 404, which contradicts the maintainer: an unset key throws a 'couldn't find an event key' error instead.",
+   "confidence": 0.55,
+   "citations": 6
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate lists removing a custom baseUrl as item 5, which is the actual fix, but it leads with the wrong diagnosis (an env-reading problem fixed by passing eventKey explicitly) even though the maintainer said an unset key gives a different error than a 404.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate mentions not overriding baseUrl/INNGEST_BASE_URL, which was the actual fix, but only as a minor last item behind generic env-var advice. It also claims a missing key falls back to NO_EVENT_KEY_SET and produces a 404, which contradicts the maintainer: an unset key throws a 'couldn't find an event key' error instead.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1431",
+  "url": "https://github.com/inngest/inngest-js/issues/1431",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly explains the cause and that the SDK must re-export the types, but it misses the maintainer's actual resolution, which was to upgrade to inngest 4.1.1 where the fix shipped, and instead suggests filing an issue and using workarounds.",
+   "confidence": 0.55,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses the cause as internal types missing from public exports, but it never gives the maintainer's fix of upgrading to inngest 4.1.1 and instead offers hedged workarounds.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly explains the cause and that the SDK must re-export the types, but it misses the maintainer's actual resolution, which was to upgrade to inngest 4.1.1 where the fix shipped, and instead suggests filing an issue and using workarounds.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1422",
+  "url": "https://github.com/inngest/inngest-js/issues/1422",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate points in the right direction by recommending an upgrade, but it states that 4.0.5 is still affected, which contradicts the maintainer's finding that 4.0.5 fixes the bug. It also leans on an unverified PR #1400 with an `isFailureHandler` guard in `validateEventSchemas`.",
+   "confidence": 0.8,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The diagnosis and workaround are plausible, but the answer misses the key resolution (upgrade to 4.0.5, where the maintainer confirmed it was fixed) and implies 4.0.5 is still broken.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate points in the right direction by recommending an upgrade, but it states that 4.0.5 is still affected, which contradicts the maintainer's finding that 4.0.5 fixes the bug. It also leans on an unverified PR #1400 with an `isFailureHandler` guard in `validateEventSchemas`.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "source": "inngest/inngest#3809",
+  "url": "https://github.com/inngest/inngest/issues/3809",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate points toward the right area by suggesting INNGEST_DEV=1 and pointing the app at http://inngest:8288 via INNGEST_DEV, but it presents that as a secondary concern behind generic networking checks and never names INNGEST_BASE_URL, which was the actual misconfiguration the maintainer identified.",
+   "confidence": 0.4,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly suggests setting INNGEST_DEV=1 on the app container, but it misses the key fix: setting INNGEST_BASE_URL=http://inngest:8288. It also leans on speculative causes, such as the signing key rejecting unsigned dev syncs and a version bump.",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate points toward the right area by suggesting INNGEST_DEV=1 and pointing the app at http://inngest:8288 via INNGEST_DEV, but it presents that as a secondary concern behind generic networking checks and never names INNGEST_BASE_URL, which was the actual misconfiguration the maintainer identified.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1279",
+  "url": "https://github.com/inngest/inngest-js/issues/1279",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does mention the maintainer's fix (use the built-in `inngest/lambda` adapter), but only as a fallback; its main diagnosis (parse the body) ignores that the user's adapter already calls JSON.parse, and its claim that a re-serialized body still passes signature validation is dubious.",
+   "confidence": 0.5,
+   "citations": 1
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate mentions the maintainer's fix (use the built-in `inngest/lambda` adapter) only as a fallback; its main fix tells the user to `JSON.parse` the body, which their adapter already does, and it speculates about a v3.24 Zod-validation change the maintainer never confirmed.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does mention the maintainer's fix (use the built-in `inngest/lambda` adapter), but only as a fallback; its main diagnosis (parse the body) ignores that the user's adapter already calls JSON.parse, and its claim that a re-serialized body still passes signature validation is dubious.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/inngest#3556",
+  "url": "https://github.com/inngest/inngest/issues/3556",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate offers a plausible manual dedupe-and-add-constraints recovery that matches the issue's direction, but it misses the actual fix (the server patch in #4037, shipped in v1.19.2, so the user should upgrade) and wrongly suggests filing a new issue and doubting that the missing constraints are the root cause.",
+   "confidence": 0.45,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate's 'try upgrading first' points the right way, but it never says the fix shipped in v1.19.2 (#4037); it also speculates that the param-count error is a separate bug the constraints may not fix, which partly contradicts the maintainer's resolution.",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate offers a plausible manual dedupe-and-add-constraints recovery that matches the issue's direction, but it misses the actual fix (the server patch in #4037, shipped in v1.19.2, so the user should upgrade) and wrongly suggests filing a new issue and doubting that the missing constraints are the root cause.",
+   "confidence": 0.45
+  }
+ },
+ {
+  "source": "inngest/inngest#3555",
+  "url": "https://github.com/inngest/inngest/issues/3555",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly identifies the tar v6/v7 export mismatch and suggests workarounds, but misses the actual resolution that upgrading to inngest-cli 1.16.1 fixes the issue (it states no official fix exists).",
+   "confidence": 0.6,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses the `tar.default.extract` breakage and offers workable workarounds, but it says it knows of no fix and only vaguely suggests a newer version, missing the maintainer's key resolution of upgrading to inngest-cli 1.16.1.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly identifies the tar v6/v7 export mismatch and suggests workarounds, but misses the actual resolution that upgrading to inngest-cli 1.16.1 fixes the issue (it states no official fix exists).",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest#3551",
+  "url": "https://github.com/inngest/inngest/issues/3551",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate's root-cause diagnosis of the sqlc slice expansion is plausible, but it misses that the bug was already fixed in #3614 and released by v1.19.0, which makes upgrading the actual resolution. It also proposes a SQL fix that wrongly changes the archive UPDATE into a DELETE.",
+   "confidence": 0.4,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses the sqlc Postgres slice-expansion bug, but it misses the key resolution that the fix landed in #3614 and ships in v1.19.0 (upgrade). It instead proposes a self-made patch that changes the archive UPDATE into a DELETE, and workarounds the maintainer never suggested.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate's root-cause diagnosis of the sqlc slice expansion is plausible, but it misses that the bug was already fixed in #3614 and released by v1.19.0, which makes upgrading the actual resolution. It also proposes a SQL fix that wrongly changes the archive UPDATE into a DELETE.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1217",
+  "url": "https://github.com/inngest/inngest-js/issues/1217",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly acknowledges that `serialize-error-cjs` drops custom properties and offers a usable Sentry-side workaround. But it misses the maintainer's actual resolution: switching back to `serialize-error`, or overriding to `serialize-error@^11.0.3` in the meantime. It also casts doubt on whether `serialize-error` would fix the issue, which contradicts the maintainer.",
+   "confidence": 0.55,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly explains that serialize-error-cjs drops custom properties and gives reasonable Sentry-side workarounds, but it misses the maintainer's key fixes: overriding the dependency with serialize-error@^11.0.3, and the maintainer's plan to patch the SDK back to serialize-error (it says it can't confirm this).",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly acknowledges that `serialize-error-cjs` drops custom properties and offers a usable Sentry-side workaround. But it misses the maintainer's actual resolution: switching back to `serialize-error`, or overriding to `serialize-error@^11.0.3` in the meantime. It also casts doubt on whether `serialize-error` would fix the issue, which contradicts the maintainer.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1158",
+  "url": "https://github.com/inngest/inngest-js/issues/1158",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly links the error to publish() being detected as a nested step and offers pinning to 3.43.0 as a workaround, but it misses that this is a regression fixed in PR #1159 (testable via `@inngest/realtime@pr-1159`) and wrongly frames moving publish out of step.run as the fix.",
+   "confidence": 0.5,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate correctly suspects a 3.45.0 regression and suggests pinning 3.43.0, but it misses the fix (PR #1159, `npm install @inngest/realtime@pr-1159`). It also wrongly claims `publish` is meant only for function-level calls, contradicting the docs and the maintainer's treatment of this as a bug, and it offers `inngest.send()` as a substitute for realtime publish.",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly links the error to publish() being detected as a nested step and offers pinning to 3.43.0 as a workaround, but it misses that this is a regression fixed in PR #1159 (testable via `@inngest/realtime@pr-1159`) and wrongly frames moving publish out of step.run as the fix.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/website#1356",
+  "url": "https://github.com/inngest/website/issues/1356",
+  "withDocs": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate correctly treats this as a docs-site bug and proposes the same fix the maintainer merged in PR #1357: add a Bun/bunx variant of the dev server command and scope the runtime selector so it only updates the intended snippet. Its hedging about whether `bunx` works, or whether `npx` was intentional, is extra caution rather than a wrong claim, so it does not change the score.",
+   "confidence": 0.4,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "Like the maintainer's fix in PR #1357, the candidate treats this as a docs bug: it adds a Bun variant (`bunx inngest-cli@latest dev`) to the dev server snippet and scopes the runtime selector so it changes only the intended snippet, with no materially wrong claims.",
+   "confidence": 0.45
+  },
+  "draftOnly": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate correctly treats this as a docs-site bug and proposes the same fix the maintainer merged in PR #1357: add a Bun/bunx variant of the dev server command and scope the runtime selector so it only updates the intended snippet. Its hedging about whether `bunx` works, or whether `npx` was intentional, is extra caution rather than a wrong claim, so it does not change the score.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1142",
+  "url": "https://github.com/inngest/inngest-js/issues/1142",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The answer correctly identifies the duplicate `inngest` install as the most likely cause and suggests deduping, but it says no confirmed fix exists and misses the maintainer's actual fix of upgrading to inngest@^3.45.1 and @inngest/realtime@^0.4.5; the cited issue number also looks unverified.",
+   "confidence": 0.5,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames a duplicate `inngest` install and points toward deduping or aligning versions, but it misses the actual fix (upgrading to `inngest@^3.45.1` and `@inngest/realtime@^0.4.5` after #1163) and wrongly says this is not a realtime bug, when the maintainer traced it to `@inngest/realtime`'s peer dependency.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The answer correctly identifies the duplicate `inngest` install as the most likely cause and suggests deduping, but it says no confirmed fix exists and misses the maintainer's actual fix of upgrading to inngest@^3.45.1 and @inngest/realtime@^0.4.5; the cited issue number also looks unverified.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1076",
+  "url": "https://github.com/inngest/inngest-js/issues/1076",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate misses the maintainer's fix of passing Zod v4 object schemas directly to `new EventSchemas().fromSchema({...})`; it instead describes `fromSchema` as a types-only generic, invents a `staticSchema` option, and says no Zod 4 support is planned, though the `zod/v3` import workaround is still useful.",
+   "confidence": 0.5,
+   "citations": 4
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses the zod 3 typing problem and offers valid workarounds (`zod/v3` subpath, `fromRecord`/`fromUnion`), but misses the maintainer's actual fix of using `new EventSchemas().fromSchema({...})`, which accepts Zod v4 schemas directly.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The candidate misses the maintainer's fix of passing Zod v4 object schemas directly to `new EventSchemas().fromSchema({...})`; it instead describes `fromSchema` as a types-only generic, invents a `staticSchema` option, and says no Zod 4 support is planned, though the `zod/v3` import workaround is still useful.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1027",
+  "url": "https://github.com/inngest/inngest-js/issues/1027",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate blames duplicate nested `inngest` copies and not the 3.40.0 regression the maintainer identified, though its advice to reinstall the latest versions would incidentally pull in the 3.40.1 fix.",
+   "confidence": 0.6,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": true,
+   "why": "The maintainer traced the error to a bug in inngest 3.40.0 that upgrading to 3.40.1 fixes; the candidate blames duplicate installs or misuse instead, and its 'upgrade both to latest' step would fix the problem only by accident. It also claims realtime ships in newer v3 releases via `inngest/realtime`, which appears to be unsupported.",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate blames duplicate nested `inngest` copies and not the 3.40.0 regression the maintainer identified, though its advice to reinstall the latest versions would incidentally pull in the 3.40.1 fix.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1032",
+  "url": "https://github.com/inngest/inngest-js/issues/1032",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames the Strict Mode double-mount and suggests upgrading to the latest 0.3.x, which would pick up the fix, but it says it can't identify a fix release instead of naming 0.3.2, weakens the upgrade advice with workarounds, and wrongly calls the error 'generally harmless'.",
+   "confidence": 0.5,
+   "citations": 5
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames React Strict Mode's double-mount and lists upgrading as the top fix, but it never names 0.3.2 as the fixing release, and its alternative workaround is wrong because gating behind a mounted state or next/dynamic does not stop Strict Mode's double effect invocation.",
+   "confidence": 0.5
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly blames the Strict Mode double-mount and suggests upgrading to the latest 0.3.x, which would pick up the fix, but it says it can't identify a fix release instead of naming 0.3.2, weakens the upgrade advice with workarounds, and wrongly calls the error 'generally harmless'.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1021",
+  "url": "https://github.com/inngest/inngest-js/issues/1021",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses a duplicate nested `inngest` copy and mentions upgrading `@inngest/realtime` only as a secondary alternative; its main advice is a manual dedupe/override workaround plus a +1 on the peer-dependency issue, whereas the maintainer's fix is simply to update both packages to latest, which already resolves it.",
+   "confidence": 0.72,
+   "citations": 3
+  },
+  "control": {
+   "score": 2,
+   "hallucinated_api": false,
+   "why": "The candidate's key fix is the same as the maintainer's: upgrade both inngest and @inngest/realtime to their latest versions; the duplicate-package explanation and the override workarounds are plausible extras, not wrong claims.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses a duplicate nested `inngest` copy and mentions upgrading `@inngest/realtime` only as a secondary alternative; its main advice is a manual dedupe/override workaround plus a +1 on the peer-dependency issue, whereas the maintainer's fix is simply to update both packages to latest, which already resolves it.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1014",
+  "url": "https://github.com/inngest/inngest-js/issues/1014",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The answer points toward Standard Schema support but misses the key fix: switching from the deprecated `.fromZod()` to `.fromSchema()` (inngest@3.42.0+), which works with both Zod v3 and v4. It also wrongly frames the issue as an untracked feature request.",
+   "confidence": 0.4,
+   "citations": 6
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The workarounds (importing from `zod/v3`, or using `fromRecord` with `z.infer` types) are plausible, but the answer misses the maintainer's actual fix: use `.fromSchema()`, which supports Zod v4 via Standard Schema as of inngest@3.42.0. It also wrongly frames Zod 4 support as an unresolved feature request.",
+   "confidence": 0.55
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The answer points toward Standard Schema support but misses the key fix: switching from the deprecated `.fromZod()` to `.fromSchema()` (inngest@3.42.0+), which works with both Zod v3 and v4. It also wrongly frames the issue as an untracked feature request.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1017",
+  "url": "https://github.com/inngest/inngest-js/issues/1017",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does suggest upgrading Next.js, which was the actual fix, but only as a third, generic option. It frames 13.4.1 as an App Router maturity issue and misses the real cause: next@13.4.1 drops the content-length header, so Inngest reads the body as a string. It leads with less relevant body-parser and proxy causes.",
+   "confidence": 0.6,
+   "citations": 1
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly says the body reaches the handler as a string, but it blames body-parser, middleware or content-type and never identifies the actual fix: upgrading Next.js from 13.4.1, which drops the content-length header and causes the handler to read the body as a string.",
+   "confidence": 0.6
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does suggest upgrading Next.js, which was the actual fix, but only as a third, generic option. It frames 13.4.1 as an App Router maturity issue and misses the real cause: next@13.4.1 drops the content-length header, so Inngest reads the body as a string. It leads with less relevant body-parser and proxy causes.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "source": "inngest/inngest#2478",
+  "url": "https://github.com/inngest/inngest/issues/2478",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does mention upgrading the SDK, but only as one generic item among several speculative causes (blocked event loop, ALB idle timeouts, container kills), and never identifies upgrading to JS SDK 3.35.1+ as the actual fix the maintainer gave.",
+   "confidence": 0.4,
+   "citations": 3
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does say to upgrade the SDK, which was the maintainer's actual fix (3.35.1+), but it treats this as a generic afterthought and leads with speculative causes (blocked event loop, proxy timeouts, worker restarts) instead of identifying the 3.35.0 SDK bug.",
+   "confidence": 0.35
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate does mention upgrading the SDK, but only as one generic item among several speculative causes (blocked event loop, ALB idle timeouts, container kills), and never identifies upgrading to JS SDK 3.35.1+ as the actual fix the maintainer gave.",
+   "confidence": 0.4
+  }
+ },
+ {
+  "source": "inngest/inngest-js#1003",
+  "url": "https://github.com/inngest/inngest-js/issues/1003",
+  "withDocs": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses a CJS-vs-ESM evaluation problem in Vite SSR, but it treats this as a regression or config issue to work around, without explaining that the single hybrid build is the cause and that the fix is the v4 dual build (#920); it also cites version 3.39.1, which appears nowhere in the question.",
+   "confidence": 0.35,
+   "citations": 2
+  },
+  "control": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses CJS code being evaluated as ESM under Vite SSR, but it treats this as a Vite config or cache problem and invents a '3.39.1' version the user never mentioned. It misses the maintainer's actual resolution: inngest's single hybrid CJS/ESM build is the cause, and it is fixed by the v4 dual-build release (#920).",
+   "confidence": 0.4
+  },
+  "draftOnly": {
+   "score": 1,
+   "hallucinated_api": false,
+   "why": "The candidate correctly diagnoses a CJS-vs-ESM evaluation problem in Vite SSR, but it treats this as a regression or config issue to work around, without explaining that the single hybrid build is the cause and that the fix is the v4 dual build (#920); it also cites version 3.39.1, which appears nowhere in the question.",
+   "confidence": 0.35
+  }
+ }
+]

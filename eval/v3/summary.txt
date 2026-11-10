@@ -1,0 +1,52 @@
+inngest/inngest#2756 docs: 2 control: 2
+inngest/inngest#1568 docs: 0 control: 0
+inngest/inngest#2079 docs: 2 control: 0
+inngest/inngest#628 docs: 1 control: 2
+inngest/inngest-js#1113 docs: 2 control: 2
+inngest/inngest#1315 docs: 1 control: 1
+inngest/inngest-js#933 docs: 1 control: 1
+inngest/inngest-js#637 docs: 1 control: 1
+inngest/inngest-js#144 docs: 1 control: 1
+inngest/inngest-js#304 docs: 1 control: 1
+inngest/inngest discussion #3154 docs: 2 control: 2
+inngest/inngest-js#78 docs: 2 control: 2
+inngest/inngest discussion #1931 docs: 1 control: 2
+inngest/inngest discussion #1256 docs: 1 control: 0
+inngest/inngest discussion #639 docs: 2 control: 2
+inngest/inngest discussion #586 docs: 2 control: 2
+inngest/inngest#3289 docs: 2 control: 2
+inngest/inngest#2216 docs: 1 control: 1
+inngest/inngest#3069 docs: 1 control: 2
+inngest/inngest#2104 docs: 0 control: 0
+inngest/inngest#2016 docs: 2 control: 2
+inngest/inngest#1929 docs: 1 control: 1
+inngest/inngest-js#955 docs: 2 control: 2
+inngest/inngest#1433 docs: 2 control: 2
+inngest/inngest-js#941 docs: 2 control: 1
+inngest/inngest-js#801 docs: 2 control: 1
+inngest/inngest-js#664 docs: 1 control: 1
+inngest/inngest-js#490 docs: 2 control: 2
+inngest/inngest-js#150 docs: 1 control: 2
+inngest/inngest-js#438 docs: 2 control: 2
+{
+ "withDocs": {
+  "meanScore": 1.43,
+  "fullyCorrect": 15,
+  "wrong": 2,
+  "hallucinated": 4,
+  "n": 30
+ },
+ "control": {
+  "meanScore": 1.4,
+  "fullyCorrect": 16,
+  "wrong": 4,
+  "hallucinated": 3,
+  "n": 30
+ },
+ "flag": {
+  "lowConfidenceN": 7,
+  "lowConfidenceMeanScore": 1,
+  "highConfidenceN": 23,
+  "highConfidenceMeanScore": 1.57
+ }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "inngest-support-assistant",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "./dev.sh",
+    "fetch-docs": "curl -sL https://www.inngest.com/llms-full.txt -o data/llms-full.txt",
+    "typecheck": "tsc",
+    "eval": "tsx eval/run.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@slack/bolt": "^5.1.0",
+    "express": "^5.3.0",
+    "inngest": "^4.26.2",
+    "minisearch": "^7.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "type": "module"
+}

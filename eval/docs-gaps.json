@@ -1,0 +1,258 @@
+[
+ {
+  "source": "inngest/inngest#2756",
+  "url": "https://github.com/inngest/inngest/issues/2756",
+  "coverage": "missing",
+  "topic": "Self-hosted signing key format",
+  "docs_should_say": "When self-hosting Inngest, INNGEST_SIGNING_KEY (--signing-key) must be a valid hexadecimal string with an even number of characters (e.g. generate one with `openssl rand -hex 32`), otherwise the server exits with 'signing-key must be a valid hexadecimal string'.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest#2079",
+  "url": "https://github.com/inngest/inngest/issues/2079",
+  "coverage": "missing",
+  "topic": "Next.js body size limit error",
+  "docs_should_say": "If a function fails with 'Body exceeded 1mb limit', the error comes from Next.js rather than Inngest, and you should raise the response body size limit in your Next.js API route configuration (e.g. via `export const config = { api: { responseLimit: false } }` or a larger value).",
+  "botMeanScore": 1.5
+ },
+ {
+  "source": "inngest/inngest#1568",
+  "url": "https://github.com/inngest/inngest/issues/1568",
+  "coverage": "missing",
+  "topic": "Troubleshooting ETIMEDOUT socket errors in dev",
+  "docs_should_say": "A 'read ETIMEDOUT' error is a Node.js socket timeout typically caused by slow or hanging external calls inside your steps or a downstream request timing out, so add timeouts and retries to outbound requests within step.run and check network/TLS connectivity of your app.",
+  "botMeanScore": 0.5
+ },
+ {
+  "source": "inngest/inngest#1315",
+  "url": "https://github.com/inngest/inngest/issues/1315",
+  "coverage": "partial",
+  "topic": "Waiting for first of multiple events",
+  "docs_should_say": "Document a waitForAny pattern: start multiple step.waitForEvent calls (each with its own timeout), chain .then on each to resolve with the first non-null result, and resolve null after Promise.all settles if none matched, noting that Promise.race waits for all parallel steps under optimized parallelism.",
+  "botMeanScore": 1.25
+ },
+ {
+  "source": "inngest/inngest#628",
+  "url": "https://github.com/inngest/inngest/issues/628",
+  "coverage": "missing",
+  "topic": "Running inngest-cli with bun x",
+  "docs_should_say": "The Inngest CLI cannot be run with `bun x inngest-cli` because it depends on a postinstall script that Bun only runs for packages in package.json `trustedDependencies` (which `bun x` cannot set), so use an alternative such as installing inngest-cli as a trusted dependency or running it via npx until Bun support is fixed.",
+  "botMeanScore": 1.5
+ },
+ {
+  "source": "inngest/inngest-js#1113",
+  "url": "https://github.com/inngest/inngest-js/issues/1113",
+  "coverage": "missing",
+  "topic": "Duplicate Next.js copies in monorepos",
+  "docs_should_say": "When using serve() from inngest/next in a monorepo, a NextRequest type mismatch (missing [INTERNALS]) means multiple Next.js copies are installed, so align versions, hoist dependencies, or force a single version via resolutions/overrides.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest-js#933",
+  "url": "https://github.com/inngest/inngest-js/issues/933",
+  "coverage": "missing",
+  "topic": "Zod version pin and overrides",
+  "docs_should_say": "The Inngest TypeScript SDK pins zod to ~3.22.3 (to support older consumer zod versions and its supported TypeScript versions) until v4, and in monorepos with version mismatches you should use npm `overrides` (or equivalent) in package.json to force a single zod version.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest-js#846",
+  "url": "https://github.com/inngest/inngest-js/issues/846",
+  "coverage": "missing",
+  "topic": "referenceFunction fully qualified ID format",
+  "docs_should_say": "referenceFunction builds the fully qualified function ID as the slugified appId and functionId joined with '-' (not the '/' form shown in the Dev Server), so the appId and functionId you pass must exactly match how the target function was registered (e.g. a function with ID 'jobs/<name>').",
+  "botMeanScore": 1.33
+ },
+ {
+  "source": "inngest/inngest-js#637",
+  "url": "https://github.com/inngest/inngest-js/issues/637",
+  "coverage": "missing",
+  "topic": "Middleware TypeScript circular reference error",
+  "docs_should_say": "If defining middleware with transformInput returning ctx triggers TS2615 circular reference errors, upgrade to TypeScript 5.1 or later (a known TypeScript bug), and use the runId property passed to the createFunction handler to access the run ID.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest-js#304",
+  "url": "https://github.com/inngest/inngest-js/issues/304",
+  "coverage": "partial",
+  "topic": "Remix Vercel web-streams-polyfill fetch workaround",
+  "docs_should_say": "When deploying Remix on Vercel, a 'First parameter has member readable that is not a ReadableStream' error is caused by web-streams-polyfill mismatches, and can be fixed by passing @remix-run/web-fetch's fetch into new Inngest({ id, fetch }) and removing allowStreaming: 'force' from serve(); also note that event payloads must be JSON-serializable, so Buffers cannot be sent in event data.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest-js#144",
+  "url": "https://github.com/inngest/inngest-js/issues/144",
+  "coverage": "partial",
+  "topic": "Event key warning in development",
+  "docs_should_say": "Add a troubleshooting note that the 'Could not find an event key' warning is harmless in local development with the Dev Server (event keys are optional there), and only needs INNGEST_EVENT_KEY, the eventKey constructor option, or inngest.setEventKey() when sending events to Inngest Cloud in production.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest-js#78",
+  "url": "https://github.com/inngest/inngest-js/issues/78",
+  "coverage": "partial",
+  "topic": "Default fetch on edge runtimes",
+  "docs_should_say": "The client's fetch option defaults to the runtime's global fetch (not cross-fetch), so Vercel Edge Functions and other edge runtimes work without configuration, and if you pass a custom fetch you must preserve its binding.",
+  "botMeanScore": 1.75
+ },
+ {
+  "source": "inngest/inngest discussion #3154",
+  "url": "https://github.com/orgs/inngest/discussions/3154",
+  "coverage": "covered",
+  "topic": "Multiple triggers including cron and event",
+  "docs_should_say": "",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest discussion #639",
+  "url": "https://github.com/orgs/inngest/discussions/639",
+  "coverage": "partial",
+  "topic": "Dynamic run priority by user tier",
+  "docs_should_say": "The priority guide should state explicitly that priority can be set via a CEL expression on event data (e.g. user tier) to let paid users run ahead of free users, and note that it only offsets queue time by a bounded number of seconds and does not by itself deprioritize heavy users within a tier, which requires combining it with concurrency or throttling keyed per user.",
+  "botMeanScore": 1.75
+ },
+ {
+  "source": "inngest/inngest discussion #1931",
+  "url": "https://github.com/orgs/inngest/discussions/1931",
+  "coverage": "partial",
+  "topic": "Waiting for external condition with waitForEvent",
+  "docs_should_say": "Add a guide stating that to pause a function until a database condition is met by another process, use step.waitForEvent with an `if` expression matching an ID (e.g. a completion ID) and have the other process emit that event, instead of using RetryAfterError, which counts as a failure and exhausts retries.",
+  "botMeanScore": 1.75
+ },
+ {
+  "source": "inngest/inngest discussion #1256",
+  "url": "https://github.com/orgs/inngest/discussions/1256",
+  "coverage": "missing",
+  "topic": "Ordering events after earlier failure",
+  "docs_should_say": "Concurrency or throttling limits do not guarantee ordering or halt later events when an earlier run fails, so to enforce order put dependent operations as sequential step.run calls in one function or have each function trigger the next on completion.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest discussion #586",
+  "url": "https://github.com/orgs/inngest/discussions/586",
+  "coverage": "partial",
+  "topic": "Code outside steps re-runs",
+  "docs_should_say": "Code in an Inngest function body outside of step.run re-executes on every invocation (once per step) until it reaches a new step, so non-deterministic or side-effecting code like database reads must be wrapped in step.run to run only once and have its result memoized.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest#3289",
+  "url": "https://github.com/inngest/inngest/issues/3289",
+  "coverage": "partial",
+  "topic": "Self-hosted signing key matching",
+  "docs_should_say": "When running a self-hosted Inngest server with `inngest start --signing-key`, the app must be configured with the identical key via `INNGEST_SIGNING_KEY` (or the SDK `signingKey` option), with `INNGEST_DEV=0` and `INNGEST_BASE_URL` pointing to the self-hosted server, otherwise registration fails with a 401 'Your signing key is invalid' error.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest#3069",
+  "url": "https://github.com/inngest/inngest/issues/3069",
+  "coverage": "partial",
+  "topic": "Code outside steps re-executes; logging",
+  "docs_should_say": "Code outside step.run re-executes on every request/step re-entry (so console.log and Math.random in the function body repeat and are non-deterministic), so put side effects and non-deterministic code inside step.run and use the `logger` from the function input for reliable logs.",
+  "botMeanScore": 1.25
+ },
+ {
+  "source": "inngest/inngest#2216",
+  "url": "https://github.com/inngest/inngest/issues/2216",
+  "coverage": "missing",
+  "topic": "Step maximum duration limit",
+  "docs_should_say": "A single step.run() has a hard, non-configurable maximum execution time of 2 hours, so long-running work must be split into multiple smaller checkpointed steps or run on an external service.",
+  "botMeanScore": 0.75
+ },
+ {
+  "source": "inngest/inngest#2104",
+  "url": "https://github.com/inngest/inngest/issues/2104",
+  "coverage": "missing",
+  "topic": "Dev server rerun from step limits",
+  "docs_should_say": "In the dev server, Rerun from step is only available for steps that have input, currently step.ai.infer and step.ai.wrap, so the button does not appear on other step types such as step.run.",
+  "botMeanScore": 0.25
+ },
+ {
+  "source": "inngest/inngest#2030",
+  "url": "https://github.com/inngest/inngest/issues/2030",
+  "coverage": "missing",
+  "topic": "Quoting strings in waitForEvent if",
+  "docs_should_say": "When interpolating string values into a step.waitForEvent `if` expression, wrap the value in quotes (e.g. `async.data.deliberationId == '${deliberationId}'`), since unquoted values are parsed as bare tokens rather than strings.",
+  "botMeanScore": 1.33
+ },
+ {
+  "source": "inngest/inngest#2016",
+  "url": "https://github.com/inngest/inngest/issues/2016",
+  "coverage": "missing",
+  "topic": "Step output size and body parser limits",
+  "docs_should_say": "A PayloadTooLargeError when returning large step data comes from your own HTTP server's body parser (e.g., Express defaults to 100kb, fixable with express.json({ limit: '500kb' })), not Inngest, whose step output limit is 4MB.",
+  "botMeanScore": 1.25
+ },
+ {
+  "source": "inngest/inngest#1929",
+  "url": "https://github.com/inngest/inngest/issues/1929",
+  "coverage": "missing",
+  "topic": "Supabase URL rewrite in-band sync",
+  "docs_should_say": "When syncing apps hosted on Supabase Edge Functions (Deno), the sync URL may be rewritten to edge-runtime.supabase.com, so set INNGEST_ALLOW_IN_BAND_SYNC=1 on the function to keep the registered URL unchanged (newer SDK versions will make in-band sync the default).",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest#1433",
+  "url": "https://github.com/inngest/inngest/issues/1433",
+  "coverage": "missing",
+  "topic": "waitForEvent race condition with early events",
+  "docs_should_say": "step.waitForEvent only matches events received after the step runs, so an event sent before the step executes (e.g. sent in quick succession) is missed and the wait times out; there is no lookback yet, so work around it by delaying the event or handling the two events in separate functions.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest-js#955",
+  "url": "https://github.com/inngest/inngest-js/issues/955",
+  "coverage": "partial",
+  "topic": "Importing Inngest class, not createClient",
+  "docs_should_say": "Import the client class with `import { Inngest } from 'inngest'` and instantiate it via `new Inngest({ id: 'my-app' })`; there is no `createClient` export, so using it with `new Inngest(...)` causes 'Inngest is not a constructor'.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest-js#941",
+  "url": "https://github.com/inngest/inngest-js/issues/941",
+  "coverage": "missing",
+  "topic": "step methods in transformInput middleware",
+  "docs_should_say": "Calling ctx.step methods directly inside transformInput is unsupported and hangs; instead start the step call as a promise in transformInput, return it under a ctx key, and await it in the function body before using the result.",
+  "botMeanScore": 1.25
+ },
+ {
+  "source": "inngest/inngest-js#801",
+  "url": "https://github.com/inngest/inngest-js/issues/801",
+  "coverage": "partial",
+  "topic": "Mocking step.sleep in tests",
+  "docs_should_say": "State explicitly that in @inngest/test an unmocked step.sleep() or step.waitForEvent() will hang t.execute() indefinitely by design, and show a code example of mocking them via the steps option (e.g. mocks: { 'wait-a-moment': { id: 'wait-a-moment', data: null } }).",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest-js#664",
+  "url": "https://github.com/inngest/inngest-js/issues/664",
+  "coverage": "partial",
+  "topic": "Dev Server with Cloudflare remote workers",
+  "docs_should_say": "When running a Cloudflare Worker with `wrangler dev --remote`, the worker cannot reach localhost, so expose the Dev Server via a public tunnel (e.g. ngrok) and set `INNGEST_DEV` to the tunnel URL and `INNGEST_SERVE_HOST` to the app URL in wrangler.toml vars.",
+  "botMeanScore": 1
+ },
+ {
+  "source": "inngest/inngest-js#490",
+  "url": "https://github.com/inngest/inngest-js/issues/490",
+  "coverage": "missing",
+  "topic": "SDK and CLI version compatibility",
+  "docs_should_say": "Inngest SDK versions 3.12.0 and later require a recent inngest-cli, so run `npx inngest-cli@latest dev` instead of an older pinned CLI (e.g. 0.23.1) to avoid the 'StepRun does not belong to Opcode values' error.",
+  "botMeanScore": 2
+ },
+ {
+  "source": "inngest/inngest-js#438",
+  "url": "https://github.com/inngest/inngest-js/issues/438",
+  "coverage": "covered",
+  "topic": "Separate clients for edge middleware",
+  "docs_should_say": "",
+  "botMeanScore": 1.75
+ },
+ {
+  "source": "inngest/inngest-js#150",
+  "url": "https://github.com/inngest/inngest-js/issues/150",
+  "coverage": "missing",
+  "topic": "Minimum supported TypeScript version",
+  "docs_should_say": "The Inngest TypeScript SDK requires a minimum TypeScript version (originally 4.7, due to instantiation expressions), and older versions will produce syntax errors in the SDK's type definitions and dependencies like type-fest, so upgrade TypeScript or temporarily set skipLibCheck.",
+  "botMeanScore": 1.75
+ }
+]

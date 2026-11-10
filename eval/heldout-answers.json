@@ -1,0 +1,972 @@
+[
+ {
+  "source": "inngest/inngest-js#330",
+  "url": "https://github.com/inngest/inngest-js/issues/330",
+  "title": "[Feature] Add middleware callback with step info before each step is ran",
+  "created_at": "2023-09-28T17:00:49Z",
+  "question": "**Is your feature request related to a problem? Please describe.**\r\nI'm frustrated when I'm trying to debug my inngest functions, because I have to manually add logs before each `step.run` call to get an overview of the progress (when not using the inngest devtools)\r\n\r\n**Describe the solution you'd like**\r\nThe middleware gives me information about the function run, but not which step is currently being ran. I would like to be able to log each step run from my own middleware, e.g. \r\n```ts\r\nbeforeExecution({ step }) {\r\n  ctx.logger.info(`Running step ${step.name}`)\r\n} \r\n```\r\nWhere the logger is the same proxy logger instance\r\n\r\n**Describe alternatives you've considered**\r\n- Using `transformOutput`, which has the context of the step. This runs _after_, ideally I'd be able to log before and after (then I could also measure run timings)\r\n\r\nI'm concious I may be misunderstanding part of the execution flow, but I wasn't able to find the step name that's about to be executed in all the middleware callbacks/context\r\n\r\n**Additional context**\r\nGiven a function run with a body like the below:\r\n```ts\r\n    await step.run(\"FIRST STEP\", async () => {\r\n      logger.info(\"--> FIRST STEP\");\r\n      return new Promise((resolve) => {\r\n        logger.info(\"Waiting 1s\");\r\n        setTimeout(() => {\r\n          logger.info(\"<-- FIRST STEP\");\r\n          resolve(null);\r\n        }, 300);\r\n      });\r\n    });\r\n\r\n    logger.info(\"Between steps\");\r\n\r\n    await step.run(\"SECOND STEP\", async () => {\r\n      // same as above\r\n    });\r\n```\r\n\r\nI get roughly these logs \r\n```\r\nmyapp:dev: steps []\r\nmyapp:dev: [17:41:23.147] INFO (19703): --> FIRST STEP\r\nmyapp:dev: [17:41:23.147] INFO (19703): Waiting 1s\r\nmyapp:dev: [17:41:23.449] INFO (19703): <-- FIRST STEP\r\nmyapp:dev: step {\r\nmyapp:dev:   name: 'FIRST STEP',\r\nmyapp:dev: }\r\nmyapp:dev: steps [ { id: 'c4dff821e3b2828e75decb728e9b96e3cdece1ac', data: null } ]\r\nmyapp:dev: beforeExecution\r\nmyapp:dev: [17:41:24.773] INFO (19703): Between steps\r\nmyapp:dev: [17:41:24.773] INFO (19703): --> SECOND STEP\r\nmyapp:dev: [17:41:24.773] INFO (19703): Waiting 1s\r\nmyapp:dev: [17:41:25.074] INFO (19703): <-- SECOND STEP\r\nmyapp:dev: step {\r\nmyapp:dev:   name: 'SECOND STEP',\r\nmyapp:dev: }\r\n```\r\n\r\np.s. Some of your diagrams about execution are great, I think the middleware docs could really do with a diagram showing when they run in relation to each stage of a function/step",
+  "gold_answer": "Staff confirmed that `beforeExecution()` fires when the function starts executing new code, not before each step, so it can't report the upcoming step name. They proposed new step-level hooks, `beforeStepExecution()` (with step info) and `afterStepExecution()` (with the result), as a missing piece in middleware. The thread does not show these hooks shipping.",
+  "gold_thread": "Hi @mcky! 👋\r\n\r\nAh - this is a perfect use case and something we want to get right for middleware to make sure it's not restrictive. The debugging middleware in #217 is actually entirely middleware (no internals at all), but it's still lacking the accuracy you're wanting here.\r\n\r\nThe technical detail here is that `beforeExecution()` tracks when we're about to begin executing new code in the function as a whole - not necessarily a new step. In addition, it may be the case that we call the hook, execute the function as a whole, and _then_ decide to run a step in the same execution. Calling the same hook twice would be a bit confusing, I think.\r\n\r\nIt sounds to me like this might warrant a new hook that clearly marks when we're running a step, like `beforeStepExcecution()` and `afterStepExecution()`.\r\n\r\n- Function hooks\r\n  - `beforeExecution()` - starting to execute new code in the function\r\n  - `afterExecution()` - finished executing the function\r\n- Step hooks\r\n  - <kbd>NEW</kbd> `beforeStepExecution()` - starting to execute a step (includes that step info)\r\n  - <kbd>NEW</kbd> `afterStepExecution()` - finished executing the step (includes result, similar to `transformOutput()`)\r\n\r\nWe've seen this requirement pop up before - I think it may be a missing piece in our hooks right now.\r\n\r\nre: p.s. - Yes! 🙌 Diagrams of when these hooks run would be great. I'm thinking a controllable animation that steps over code on one side and hooks on the other might be good. 🤔 ",
+  "cleaned": {
+   "question": "In an Inngest function using step.run, the middleware beforeExecution callback does not expose the name of the step about to execute, so the developer cannot log each step before it runs. The only step-aware hook, transformOutput, runs after the step, which blocks logging before a step and measuring its duration. Is there a middleware hook that receives step info before each step runs, or is this a feature request?",
+   "queries": [
+    "inngest middleware before step execution",
+    "inngest middleware transformOutput step",
+    "inngest beforeExecution hook step name"
+   ],
+   "codeTerms": [
+    "beforeExecution",
+    "transformOutput",
+    "step.run"
+   ]
+  },
+  "nSources": 10,
+  "firstDraft": {
+   "text": "Yes, on the v4 TypeScript SDK this isn't a feature request. The v4 middleware API has step-aware hooks that run before the step executes [1]:\n\n- **`onStepStart()`** runs just before each step executes. Use it to log the step before it runs.\n- **`transformStepInput()`** runs earlier in the same per-step sequence, if you need to modify the step input.\n- **`wrapStep()`** receives `stepInfo` (as in the docs example, `stepInfo.hashedId`) and wraps the whole step. Put code before `next()` to log, then code after it to measure duration [1][2].\n- **`wrapStepHandler()`** wraps only the handler execution, which gives the tightest timing.\n- **`onStepComplete()` / `onStepError()`** run after the step.\n\nFor timing, `wrapStep` is the simplest option:\n\n```ts\nclass StepTiming extends Middleware.BaseMiddleware {\n  id = \"step-timing\";\n  async wrapStep({ next, stepInfo }: Middleware.WrapStepArgs) {\n    const start = Date.now();\n    console.log(\"starting step\", stepInfo);\n    try {\n      return await next();\n    } finally {\n      console.log(\"step took\", Date.now() - start, \"ms\");\n    }\n  }\n}\n```\n\nThe `beforeExecution` and `transformOutput` hooks you describe are the older (v3 and Python) API [3]. The v4 hooks above replace them. If you're on v3, upgrade to v4 to get them. I'm not certain of the exact `stepInfo` fields beyond `hashedId`, so check the type definitions for the step name.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 2,
+     "title": "Middleware examples",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/examples"
+    },
+    {
+     "n": 3,
+     "title": "Python middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/python/middleware/lifecycle"
+    }
+   ],
+   "confidence": 0.8,
+   "docsGap": "The docs don't list the exact fields on `stepInfo` (such as the step display name) or say how the v4 hooks map to the older `beforeExecution` and `transformOutput` hooks.",
+   "whyUnsure": null
+  },
+  "withDocs": {
+   "text": "Yes, on the v4 TypeScript SDK this isn't a feature request. The v4 middleware API has step-aware hooks that run before the step executes [1]:\n\n- **`onStepStart()`** runs just before each step executes. Use it to log the step before it runs.\n- **`transformStepInput()`** runs earlier in the same per-step sequence, if you need to modify the step input.\n- **`wrapStep()`** receives `stepInfo` (as in the docs example, `stepInfo.hashedId`) and wraps the whole step. Put code before `next()` to log, then code after it to measure duration [1][2].\n- **`wrapStepHandler()`** wraps only the handler execution, which gives the tightest timing.\n- **`onStepComplete()` / `onStepError()`** run after the step.\n\nFor timing, `wrapStep` is the simplest option:\n\n```ts\nclass StepTiming extends Middleware.BaseMiddleware {\n  id = \"step-timing\";\n  async wrapStep({ next, stepInfo }: Middleware.WrapStepArgs) {\n    const start = Date.now();\n    console.log(\"starting step\", stepInfo);\n    try {\n      return await next();\n    } finally {\n      console.log(\"step took\", Date.now() - start, \"ms\");\n    }\n  }\n}\n```\n\nThe `beforeExecution` and `transformOutput` hooks you describe are the older (v3 and Python) API [3]. The v4 hooks above replace them. If you're on v3, upgrade to v4 to get them. I'm not certain of the exact `stepInfo` fields beyond `hashedId`, so check the type definitions for the step name.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 2,
+     "title": "Middleware examples",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/examples"
+    },
+    {
+     "n": 3,
+     "title": "Python middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/python/middleware/lifecycle"
+    }
+   ],
+   "confidence": 0.8,
+   "docsGap": "The docs don't list the exact fields on `stepInfo` (such as the step display name) or say how the v4 hooks map to the older `beforeExecution` and `transformOutput` hooks.",
+   "whyUnsure": null
+  },
+  "control": {
+   "text": "Short answer: in the TS SDK there isn't a dedicated \"before each step\" hook that receives the step name, so you can't do this cleanly with `beforeExecution` today. Treat the step name gap as a limitation or feature request, not something you're missing.\n\nWhat exists in the middleware `onFunctionRun` lifecycle (v3):\n- `transformInput`: runs when the function is invoked. It gets `ctx` and `steps` (already-memoized step data), but not the step about to run.\n- `beforeMemoization` / `afterMemoization`, `beforeExecution` / `afterExecution`: these mark phases of the function run, with no step info.\n- `transformOutput`: gets `result` and, for step results, the step info (e.g. `result.step` with its id/name). It runs after the step.\n- `finished`, `beforeResponse`: run at the end of the run or request.\n\nWorkarounds:\n1. Wrap `step.run` yourself. In `transformInput`, return a `ctx` with a wrapped `step` whose `run` logs the name, starts a timer, calls the original, then logs the duration. I'm fairly sure this works, but I haven't verified it against the current SDK types.\n2. Use `transformOutput` for after-step logging. Pair it with `beforeExecution` timestamps to approximate durations.\n3. Log inside each `step.run` callback.\n\nI'd file a feature request for a per-step hook, e.g. `onStepStart` or `beforeStepExecution`, with the step name and id. Please check the latest SDK release notes first, in case one has been added.",
+   "citations": [],
+   "confidence": 0.55,
+   "docsGap": "The middleware docs should state which lifecycle hooks receive step info (name/id) and show how to wrap step.run for per-step timing.",
+   "whyUnsure": "No doc or past fix matched this: answer is from memory of the SDK middleware API and may be outdated."
+  }
+ },
+ {
+  "source": "inngest/inngest-js#331",
+  "url": "https://github.com/inngest/inngest-js/issues/331",
+  "title": "[Feature] Allow creating child loggers, or modifying the parent logger state",
+  "created_at": "2023-09-28T17:23:55Z",
+  "question": "**Is your feature request related to a problem? Please describe.**\r\nInngest's automatic child logger creation is great, but I find myself wanting to pass additional info with each log line, so that they can be grouped together later. \r\n\r\n**Describe the solution you'd like**\r\nI'd like to either be able to\r\n\r\n**a)** Extend the `logger` from the context by calling `.child` on it and passing my own context.\r\nIt seems like passing a generic inferred from the `logger` instance passed to the `Inngest` constructor down to the function could help tell if a logger supports child logging, from the context of the function\r\n```ts\r\n  async ({ event, step, logger }) => {\r\n    const transactionLogger = logger.child({ transactionId });\r\n\r\n    const model = new SomeModel(deps, transactionLogger);\r\n\r\n    transactionLogger.info(`Doing thing for transaction`);\r\n```\r\n**b)** Somehow attach more metadata to the function, and/or it's logs (rough sketch as an example, not particularly a suggested API)\r\n```ts\r\n  async ({ event, step, logger, setMeta }) => {\r\n    setMeta({ transactionId })\r\n    // all calls to `logger`, if it supports child loggers, will now have the meta applied\r\n```\r\nOption **b** is with https://github.com/inngest/inngest-js/issues/330 in mind, although since the middleware run before user code is executed that wouldn't really work.\r\n\r\n**c)** If **b** doesn't work because of execution order, perhaps being able to call `.child` from a function-specific middleware\r\n```ts\r\nconst loggingMiddlewarenew InngestMiddleware({\r\n// ...\r\n          transformInput(ctx) {\r\n            const logger = ctx.logger.child({ transactionId: fromEventDataSomehow })\r\n            return { ctx: { logger } };\r\n          },\r\n});\r\n\r\ninngest.createFunction(\r\n  { name: \"Example\", middleware: [loggingMiddleware] },\r\n  { event: \"app/example\" },\r\n  async ({ event, step, ctx }) => {\r\n    ctx.logger.info(`I have transactionId in my context`)\r\n```\r\n\r\n\r\n**Describe alternatives you've considered**\r\n- I can just log the `transactionId` once, and from that find the inngest provided `runID` and use that to filter logs\r\n- I've used `pnpm patch` to patch the inngest SDK for our app to add hacky support for a child logger. This works for us for now, but it feels very hacky\r\n\r\n```patch\r\n--- a/middleware/logger.js\r\n+++ b/middleware/logger.js\r\n@@ -26,6 +26,9 @@ class DefaultLogger {\r\n+    child(...args) {\r\n+        throw new Error(\"logger.child not implemented for DefaultLogger\")\r\n+    }\r\n@@ -62,6 +65,9 @@ class ProxyLogger {\r\n+    child(...args) {\r\n+        return __classPrivateFieldGet(this, _ProxyLogger_logger, \"f\").child(...args);\r\n+    }\r\n```\r\n\r\n**Additional context**\r\nI found this part of the docs slightly misleading, as it led me to believe I'd be able to bring my own child-compatable logger. Re-reading it I can see it doesn't actually state that, but it tripped me up. \r\n> [**child logger**](https://www.inngest.com/docs/guides/logging#child-logger)\r\n> If the logger library supports a child logger .child() implementation, the built-in middleware will utilize it to add function runtime metadata for you.\r\n",
+  "gold_answer": "Staff said you can already pass your own logger with `.child()` when creating the Inngest client, but the types don't reflect that. They plan to extend the passed logger's type so `.child()` is available in functions. Exposing `logger` inside middleware, which would enable the other proposed approaches, was noted as a limiting factor, with no shipped fix yet.",
+  "gold_thread": "Hi, @mcky! 👋\r\n\r\nThanks loads for this detailed write-up.\r\n\r\nI believe you _should_ be able to bring your own child-compatible logger if you pass a logger with a `.child()` when creating your client, but aye, types won't reflect that, meaning you don't have access to it. We could perhaps simply extend whatever logger you pass there, ensuring you have all of the usual methods (like `.child()`), then this would be less of a problem.\r\n\r\nThat feels like the best immediate fix, but you raise some good points about middleware and not having access to everything you need. After the fix above, I guess the limiting factor stopping you achieving any of your listed solutions (without patching) is not being able to access `logger` within the middleware hooks?\r\n\r\nThe logging itself is, internally, middleware, which currently doesn't appear when creating extra middleware. If you _did_ have access to `logger` within your middleware, you could shim it nicely and have the ability to add tools you're wanting such as `setMeta`.",
+  "cleaned": {
+   "question": "A developer using the Inngest TypeScript SDK (inngest-js) asks for a way to create child loggers from the function's `logger` context, or to attach metadata such as transactionId to all logs in a function run. They report that the default logger throws \"logger.child not implemented for DefaultLogger\" and that ProxyLogger does not forward child(), so they patched the SDK with pnpm patch, and they note the docs' child logger section implies a custom logger with .child() would be used. They also suggest a middleware transformInput hook that returns a child logger on ctx.logger.",
+   "queries": [
+    "logger child context inngest",
+    "custom logger child function",
+    "middleware transformInput logger"
+   ],
+   "codeTerms": [
+    "logger.child not implemented",
+    "DefaultLogger",
+    "ProxyLogger",
+    "transformInput"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "Short version: pass a logger that implements `.child()` to the client and the SDK will use it. The `DefaultLogger` is just a console wrapper with no `.child()`, which is why you hit that error. The source you patched is the older v3-era `middleware/logger.ts` [9].\n\nPer the docs, if your logger supports `.child()`, the built-in logging middleware uses it to add function name, event name and run ID to every log automatically [2]. So with pino, winston (wrapped) or similar:\n\n```ts\nconst inngest = new Inngest({ id: \"my-app\", logger: pino() });\n```\n\nFor per-run metadata like `transactionId`, your middleware idea is the supported route. The built-in logger is itself middleware, and you can write your own to customize it [4]. In v4, middleware is class-based (`Middleware.BaseMiddleware`) with a `transformInput` hook [3]. Return a `ctx.logger` from there, built with `baseLogger.child({ transactionId: ctx.event.data.transactionId })`. See the logging middleware example in the v4 middleware examples [4]. I haven't verified the exact `transformInput` return shape, so check that example.\n\nUntil then, a simple workaround is a plain logger wrapper, or passing `{ transactionId }` as the first argument on each call.\n\nAlso, `internalLogger` only routes SDK-internal logs and doesn't affect `ctx.logger` [1].\n\nIf you're on v3, `ProxyLogger` not forwarding `child()` is a real limitation. Upgrading to v4 or using the middleware approach avoids patching.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Logging",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/logging"
+    },
+    {
+     "n": 2,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 3,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 4,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 9,
+     "title": "Source code: inngest-js/packages/inngest/src/middleware/logger.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/a0052100a7cd30cc7035e17fd20e88d5b8d5425f/packages/inngest/src/middleware/logger.ts#L27"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The docs should show how to attach per-run metadata such as a transactionId to ctx.logger via middleware, and should say what happens when the configured logger has no .child().",
+   "whyUnsure": "Docs only partly cover this: the exact v4 transformInput return shape for overriding ctx.logger isn't shown in the sources."
+  },
+  "withDocs": {
+   "text": "Short version: pass a logger that implements `.child()` to the client and the SDK will use it. The `DefaultLogger` is just a console wrapper with no `.child()`, which is why you hit that error. The source you patched is the older v3-era `middleware/logger.ts` [9].\n\nPer the docs, if your logger supports `.child()`, the built-in logging middleware uses it to add function name, event name and run ID to every log automatically [2]. So with pino, winston (wrapped) or similar:\n\n```ts\nconst inngest = new Inngest({ id: \"my-app\", logger: pino() });\n```\n\nFor per-run metadata like `transactionId`, your middleware idea is the supported route. The built-in logger is itself middleware, and you can write your own to customize it [4]. In v4, middleware is class-based (`Middleware.BaseMiddleware`) with a `transformInput` hook [3]. Return a `ctx.logger` from there, built with `baseLogger.child({ transactionId: ctx.event.data.transactionId })`. See the logging middleware example in the v4 middleware examples [4]. I haven't verified the exact `transformInput` return shape, so check that example.\n\nUntil then, a simple workaround is a plain logger wrapper, or passing `{ transactionId }` as the first argument on each call.\n\nAlso, `internalLogger` only routes SDK-internal logs and doesn't affect `ctx.logger` [1].\n\nIf you're on v3, `ProxyLogger` not forwarding `child()` is a real limitation. Upgrading to v4 or using the middleware approach avoids patching.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Logging",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/logging"
+    },
+    {
+     "n": 2,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 3,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 4,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 9,
+     "title": "Source code: inngest-js/packages/inngest/src/middleware/logger.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/a0052100a7cd30cc7035e17fd20e88d5b8d5425f/packages/inngest/src/middleware/logger.ts#L27"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The docs should show how to attach per-run metadata such as a transactionId to ctx.logger via middleware, and should say what happens when the configured logger has no .child().",
+   "whyUnsure": "Docs only partly cover this: the exact v4 transformInput return shape for overriding ctx.logger isn't shown in the sources."
+  },
+  "control": {
+   "text": "There's no built-in `logger.child()` or per-run metadata API in the SDK that I can point you to. I'm confident of that for the default logger, which throws on `child`. I'm less sure whether newer versions have changed `ProxyLogger`.\n\n**What works today:** the `logger` option on the client is used as the base logger, and the SDK wraps it in a `ProxyLogger` that exposes only the standard methods (`info`, `warn`, `error`, `debug`). The wrapper doesn't forward `child()`. That's why your patch was needed.\n\n**Workaround without patching:** build the child logger yourself inside the function and use it directly, instead of `ctx.logger`:\n\n```ts\nconst baseLogger = pino();\n\ninngest.createFunction({ id: \"my-fn\" }, { event: \"app/thing\" },\n  async ({ event, step }) => {\n    const log = baseLogger.child({ transactionId: event.data.transactionId });\n    log.info(\"starting\");\n    await step.run(\"x\", async () => { log.info(\"in step\"); });\n  });\n```\n\nPass the same `baseLogger` as `new Inngest({ logger: baseLogger })` so the configuration stays consistent.\n\n**Middleware idea:** a `transformInput` that returns `{ ctx: { log: child } }` works, because middleware can add new fields to ctx. Add it under a new name like `log`. Overriding `ctx.logger` may not be reliably typed or honored, because the SDK sets its own `logger` on ctx. Create the child inside `transformInput` from `ctx.event` data.\n\nNeither approach is flushed or handled by the SDK's logger lifecycle. Remember that logs inside memoized steps will repeat on each function re-invocation.\n\nI'd suggest filing a feature request or PR on inngest-js for `ProxyLogger.child()` forwarding.",
+   "citations": [],
+   "confidence": 0.5,
+   "docsGap": "The logging docs show a child logger section but don't say that ctx.logger doesn't support child() or how to attach per-run metadata.",
+   "whyUnsure": "No doc or past fix matched this: unsure whether recent SDK versions added child() support or ctx.logger override via middleware."
+  }
+ },
+ {
+  "source": "inngest/inngest-js#103",
+  "url": "https://github.com/inngest/inngest-js/issues/103",
+  "title": "SolidStart support?",
+  "created_at": "2023-02-16T04:20:02Z",
+  "question": "**Is your feature request related to a problem? Please describe.**\r\n\r\nN/A\r\n\r\n**Describe the solution you'd like**\r\n\r\nWould like to use Inngest in conjunction with solid-start app.\r\n\r\n**Describe alternatives you've considered**\r\n\r\nN/A\r\n\r\n**Additional context**\r\n\r\nN/A\r\n",
+  "gold_answer": "SolidStart support is available in a version of the SDK installed with `npm install inngest@solid`. Staff pointed to the inngest/sdk-example-solidstart-vercel repo, which shows the serve handler at src/routes/api/inngest.ts and the client and functions in src/inngest/. Integration tests and docs were still pending at the time.",
+  "gold_thread": "@fritzblue Progress for this being tracked here 🙂 \r\n\r\n- #106\n---\n@fritzblue A version of this is up if you `npm install inngest@solid`.\r\n\r\nNeed to add it to the suite of integration tests and add docs, but would love for you to test it if you have time.\r\n\r\nThere's an [inngest/sdk-example-solidstart-vercel](https://github.com/inngest/sdk-example-solidstart-vercel) repo with an example of it running.\r\n\r\n- [`src/routes/api/inngest.ts`](https://github.com/inngest/sdk-example-solidstart-vercel/blob/main/src/routes/api/inngest.ts) - the serve handler\r\n- [`src/inngest/`](https://github.com/inngest/sdk-example-solidstart-vercel/tree/main/src/inngest) - a directory for holding the Inngest client and functions",
+  "cleaned": {
+   "question": "Is there support or a plan for using Inngest with SolidStart (the Solid.js meta-framework) applications? The requester wants to use Inngest together with a solid-start app.",
+   "queries": [
+    "SolidStart Inngest integration",
+    "Inngest SDK framework support",
+    "Inngest serve handler adapter"
+   ],
+   "codeTerms": [
+    "serve",
+    "solid-start",
+    "createServe"
+   ]
+  },
+  "nSources": 10,
+  "firstDraft": {
+   "text": "I can't confirm a first-party SolidStart handler. The sources don't list one, and I don't know of an `inngest/solid-start` export. I'd verify against the current supported-frameworks list before telling the user either way.\n\nSolidStart doesn't need a dedicated adapter, though. Inngest only needs an HTTP endpoint at `/api/inngest` that handles GET, POST and PUT [2]. For frameworks without an official handler, the docs say you can create a custom handler [3].\n\nSolidStart API routes receive a standard `APIEvent` that includes a Web `Request`. A custom handler can wrap that request. Alternatively, you could mount an officially supported handler, such as Express or Hono, alongside the app.\n\nA custom handler should:\n- Set `servePath` to `/api/inngest` [1].\n- Pass through the GET, POST and PUT methods [2].\n- Return Web `Response` objects.\n\nI haven't tested this in SolidStart. Before sending, please check the supported-frameworks page (/docs/learn/serving-inngest-functions) for a SolidStart entry. I can't tell whether one is planned. For that, point the user to a GitHub issue on inngest-js or to Discord.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    },
+    {
+     "n": 2,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    },
+    {
+     "n": 3,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    }
+   ],
+   "confidence": 0.5,
+   "docsGap": "The docs should say whether SolidStart is supported, or give a custom-handler example for Web Request/Response-based frameworks like SolidStart.",
+   "whyUnsure": "No doc or past fix matched this: the sources don't mention SolidStart or the list of supported frameworks."
+  },
+  "withDocs": {
+   "text": "I can't confirm a first-party SolidStart handler. The sources don't list one, and I don't know of an `inngest/solid-start` export. I'd verify against the current supported-frameworks list before telling the user either way.\n\nSolidStart doesn't need a dedicated adapter, though. Inngest only needs an HTTP endpoint at `/api/inngest` that handles GET, POST and PUT [2]. For frameworks without an official handler, the docs say you can create a custom handler [3].\n\nSolidStart API routes receive a standard `APIEvent` that includes a Web `Request`. A custom handler can wrap that request. Alternatively, you could mount an officially supported handler, such as Express or Hono, alongside the app.\n\nA custom handler should:\n- Set `servePath` to `/api/inngest` [1].\n- Pass through the GET, POST and PUT methods [2].\n- Return Web `Response` objects.\n\nI haven't tested this in SolidStart. Before sending, please check the supported-frameworks page (/docs/learn/serving-inngest-functions) for a SolidStart entry. I can't tell whether one is planned. For that, point the user to a GitHub issue on inngest-js or to Discord.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    },
+    {
+     "n": 2,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    },
+    {
+     "n": 3,
+     "title": "Serve",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/serve/index"
+    }
+   ],
+   "confidence": 0.5,
+   "docsGap": "The docs should say whether SolidStart is supported, or give a custom-handler example for Web Request/Response-based frameworks like SolidStart.",
+   "whyUnsure": "No doc or past fix matched this: the sources don't mention SolidStart or the list of supported frameworks."
+  },
+  "control": {
+   "text": "Yes, it's usable today, though I'm not certain there's a dedicated SolidStart adapter. The `inngest` SDK has no `inngest/solid-start` handler as far as I know. SolidStart API routes are built on Nitro/Vinxi and use standard Web `Request`/`Response` handlers. You can serve Inngest through a generic handler.\n\nOptions:\n1. Check the \"Serve\" docs for a current framework list. If SolidStart is there, use that adapter.\n2. Otherwise, use the `inngest/edge` handler (`serve` from `inngest/edge`). It takes a Web `Request` and returns a `Response`, which matches SolidStart's API route signature.\n\n```ts\n// src/routes/api/inngest.ts\nimport { serve } from \"inngest/edge\";\nimport { inngest } from \"~/inngest/client\";\nimport { myFunction } from \"~/inngest/functions\";\n\nconst handler = serve({ client: inngest, functions: [myFunction] });\n\nexport const GET = ({ request }: { request: Request }) => handler(request);\nexport const POST = ({ request }: { request: Request }) => handler(request);\nexport const PUT = ({ request }: { request: Request }) => handler(request);\n```\n\nThen run `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` to point the Dev Server at the route.\n\nI haven't verified this against the current SolidStart version, so test it. The exact handler signature and whether `inngest/edge` needs extra options (such as `serveHost` or env handling) may differ. If it fails, `inngest/edge` is still the closest fit, and a GitHub issue or feature request would be the way to ask for an official adapter.",
+   "citations": [],
+   "confidence": 0.5,
+   "docsGap": "The serve docs should state whether SolidStart is supported and show a SolidStart example, or point to the edge handler.",
+   "whyUnsure": "No doc or past fix matched this: unsure whether an official SolidStart adapter exists now."
+  }
+ },
+ {
+  "source": "inngest/agent-kit#244",
+  "url": "https://github.com/inngest/agent-kit/issues/244",
+  "title": "Example Deep Research not working due to undefined (reading 'step')",
+  "created_at": "2025-11-07T00:49:24Z",
+  "question": "The example deep-research is not working as is out of the box. Maybe needs a version bump or something?\n\nIssue: \n```\nTypeError: Cannot read properties of undefined (reading 'step')\n    at getStepTools (webpack-internal:///(rsc)/./node_modules/@inngest/agent-kit/dist/chunk-QBAU6UTA.js:213:51)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async AgenticModel.infer (webpack-internal:///(rsc)/./node_modules/@inngest/agent-kit/dist/chunk-QBAU6UTA.js:874:18)\n    at async _Agent.performInference (webpack-internal:///(rsc)/./node_modules/@inngest/agent-kit/dist/chunk-QBAU6UTA.js:1032:29)\n    at async _Agent.run (webpack-internal:///(rsc)/./node_modules/@inngest/agent-kit/dist/chunk-QBAU6UTA.js:1013:25)\n    at async NetworkRun.execute (webpack-internal:///(rsc)/./node_modules/@inngest/agent-kit/dist/chunk-QBAU6UTA.js:1446:20)\n    at async V1InngestExecution.eval [as userFnToRun] (webpack-internal:///(rsc)/./inngest/functions/simple-agent.ts:96:22)\n POST /api/inngest?fnId=realtime-nextjs-demos-simple-agent-workflow&stepId=step 500 in 7ms\n```\n\nRepro:\n```\ngit clone https://github.com/inngest/agent-kit\ncd agent-kit/examples\nnpm install\nnpx inngest-cli@latest dev (in another tab)\nnpm run dev   \n```\n\n\nAdditional info:\n```\nnpm --version\n11.3.0\nnode --version\nv24.2.0\n\nApple M4 Max\nSequoia 15.6.1\n```",
+  "gold_answer": "The fix is in the canary build of @inngest/agent-kit from PR #245, not in a stable release. Installing that build (`npm install @inngest/agent-kit@0.13.2-alpha-20251107125129-caccd8a0430bd554cc98f8eea109c9677267b276`) resolved the error, as confirmed by the reporter.",
+  "gold_thread": "Thanks for the report, @prodigious-diego!\n\nAre you saying that that example isn't playing nicely with `inngest@3.45.0`?\n---\nI'm expecting that this is fixed in #245; could you test out the canary build and confirm, @prodigious-diego? 🙂 \n---\n@helpingwithtech have you tried the canary build of `@inngest/agent-kit` in #245?\n```\nnpm install @inngest/agent-kit@0.13.2-alpha-20251107125129-caccd8a0430bd554cc98f8eea109c9677267b276\n```",
+  "cleaned": {
+   "question": "The Inngest agent-kit example \"deep-research\" fails out of the box with \"TypeError: Cannot read properties of undefined (reading 'step')\" thrown from getStepTools in @inngest/agent-kit (chunk-QBAU6UTA.js), called via AgenticModel.infer, Agent.performInference, Agent.run, and NetworkRun.execute while running simple-agent.ts. The developer is on Node v24.2.0, npm 11.3.0, and macOS Sequoia 15.6.1, running the examples with npm install, npx inngest-cli@latest dev, and npm run dev, and asks whether a version bump is needed.",
+   "queries": [
+    "agent-kit getStepTools undefined step",
+    "agent-kit AgenticModel infer step error",
+    "agent-kit examples deep-research fails"
+   ],
+   "codeTerms": [
+    "getStepTools",
+    "AgenticModel",
+    "performInference",
+    "NetworkRun"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "Most likely yes, it's a version mismatch, not your Node/npm/macOS setup. `getStepTools` reads the step tools from the async context of a running Inngest function. In `AgenticModel.infer`, it gets `undefined` back, so `.step` fails. That happens when `@inngest/agent-kit` and the `inngest` package resolve to incompatible versions. Examples are a v3-era agent-kit paired with a newer `inngest` (v4), or two separate copies of `inngest` installed.\n\nTry this:\n1. Run `npm ls inngest @inngest/agent-kit` in the example. Look for duplicates or a version outside agent-kit's `inngest` peer/dependency range.\n2. Align them. Either upgrade to the latest `@inngest/agent-kit` and `inngest` together, or pin `inngest` to the version the example's lockfile targets. Then delete `node_modules` and the lockfile and run `npm install` again.\n3. Make sure the agent runs inside an Inngest function (via `step`/`serve`), not by calling `network.run()` directly from a plain script. Without a function context, `getStepTools` returns undefined. If you hit this in `simple-agent.ts`, check how it's invoked.\n\nI couldn't confirm the exact fixed version from the sources. If the aligned versions still fail, please share the `npm ls` output and the example's `package.json`.",
+   "citations": [],
+   "confidence": 0.5,
+   "docsGap": "The agent-kit docs don't give the compatible inngest SDK version range or explain the getStepTools \"undefined step\" error that appears when the two packages mismatch or when it runs outside a function context.",
+   "whyUnsure": "No doc or past fix matched this"
+  },
+  "withDocs": {
+   "text": "Most likely yes, it's a version mismatch, not your Node/npm/macOS setup. `getStepTools` reads the step tools from the async context of a running Inngest function. In `AgenticModel.infer`, it gets `undefined` back, so `.step` fails. That happens when `@inngest/agent-kit` and the `inngest` package resolve to incompatible versions. Examples are a v3-era agent-kit paired with a newer `inngest` (v4), or two separate copies of `inngest` installed.\n\nTry this:\n1. Run `npm ls inngest @inngest/agent-kit` in the example. Look for duplicates or a version outside agent-kit's `inngest` peer/dependency range.\n2. Align them. Either upgrade to the latest `@inngest/agent-kit` and `inngest` together, or pin `inngest` to the version the example's lockfile targets. Then delete `node_modules` and the lockfile and run `npm install` again.\n3. Make sure the agent runs inside an Inngest function (via `step`/`serve`), not by calling `network.run()` directly from a plain script. Without a function context, `getStepTools` returns undefined. If you hit this in `simple-agent.ts`, check how it's invoked.\n\nI couldn't confirm the exact fixed version from the sources. If the aligned versions still fail, please share the `npm ls` output and the example's `package.json`.",
+   "citations": [],
+   "confidence": 0.5,
+   "docsGap": "The agent-kit docs don't give the compatible inngest SDK version range or explain the getStepTools \"undefined step\" error that appears when the two packages mismatch or when it runs outside a function context.",
+   "whyUnsure": "No doc or past fix matched this"
+  },
+  "control": {
+   "text": "This is almost certainly a version mismatch, not a Node/macOS problem. `getStepTools` reads `step` from the async-local-storage context that the Inngest SDK sets up when a function executes. If `@inngest/agent-kit` resolves a different copy of `inngest` than the one running your function, that context is `undefined`, and you get `Cannot read properties of undefined (reading 'step')`. A network or agent run outside an Inngest function (no `step` context) fails the same way.\n\nTry this:\n1. In the example directory, run `npm ls inngest @inngest/agent-kit`. Look for duplicate or mismatched `inngest` versions.\n2. Bump both to current and dedupe: `npm i inngest@latest @inngest/agent-kit@latest && npm dedupe`. Then delete `node_modules` and the lockfile and reinstall if it persists.\n3. Check that `inngest` is a single version, because agent-kit declares it as a peer dependency.\n4. If `simple-agent.ts` calls `network.run(...)` directly in a plain script, run it inside an Inngest function instead (`inngest.createFunction(...)` served via `serve`, and triggered by an event). Then `step` is available. Running it directly outside a function only works in the newer agent-kit versions that fall back to non-durable execution.\n\nSo yes, a version bump is likely needed. The examples pin older versions that can drift from the latest `inngest`. Node 24 is probably not the cause, but if the bump doesn't help, try Node 22 LTS to rule it out.\n\nI'm working from memory here, not from a source, so I'm not certain which of the causes above applies. The `npm ls` output would show which one it is.",
+   "citations": [],
+   "confidence": 0.55,
+   "docsGap": "The agent-kit docs and examples should say which inngest version they require, and that network.run must run inside an Inngest function (or what fallback applies) to avoid the getStepTools error.",
+   "whyUnsure": "No doc or past fix matched this: the diagnosis comes from my knowledge of the SDK's context handling, not a confirmed fix."
+  }
+ },
+ {
+  "source": "inngest/agent-kit#77",
+  "url": "https://github.com/inngest/agent-kit/issues/77",
+  "title": "ESM Module Error: @dmitryrechkin/json-schema-to-zod compatibility with agent-kit",
+  "created_at": "2025-02-27T00:13:03Z",
+  "question": "## Bug Description\nWhen using the latest version of @inngest/agent-kit (v0.3.0) with Next.js, I'm encountering an ESM/CommonJS compatibility issue. The agent-kit package tries to import @dmitryrechkin/json-schema-to-zod using CommonJS require(), but that package is an ESM module.\n\nWhen using @inngest/agent-kit v0.2.2:\n\n ⨯ [Error: require() of ES Module /Users/ruby/code/nexus-workflow/node_modules/@dmitryrechkin/json-schema-to-zod/dist/index.js from /Users/ruby/code/nexus-workflow/node_modules/@inngest/agent-kit/dist/agent.js not supported.\nInstead change the require of index.js in /Users/ruby/code/nexus-workflow/node_modules/@inngest/agent-kit/dist/agent.js to a dynamic import() which is available in all CommonJS modules.] {\n  code: 'ERR_REQUIRE_ESM'\n}\n\n\n\n## Environment\n- Next.js: 15.1.3\n- @inngest/agent-kit: Tested v0.1.2 (works), v0.2.2 and v0.3.0 (both fail)\n- inngest: 3.31.11\n- React: 19.0.0\n- Node.js version: 20.15.1\n\n## Reproduction Steps\n1. Set up a Next.js project with dependencies as listed above\n2. Install @inngest/agent-kit v0.1.2 (works correctly)\n3. Upgrade to @inngest/agent-kit v0.2.2 or v0.3.0\n4. Run the development server (npm run dev)\n5. The server fails with ESM/CommonJS compatibility errors\n\n## Attempted Solutions\nI've tried various workarounds including:\n- Adding transpilePackages: ['@inngest/agent-kit', '@dmitryrechkin/json-schema-to-zod'] to next.config.js\n- Setting experimental.esmExternals to 'loose' in next.config.js\n- Creating a bridge module that avoids using agent-kit directly and falls back to inngest.step.ai.infer()\n- Modifying webpack configuration to handle ESM modules\n- Downgrading from v0.3.0 to v0.2.2 (but encountered similar errors with pkce-challenge)\n\nNone of these solutions have fully resolved the issue. The only version that works correctly is v0.1.2, but it lacks the newer features I need.\n\n## Suggested Fix\nThe agent-kit package should be updated to:\n1. Use dynamic import() instead of require() when importing ESM modules\n2. Provide a compatibility layer for both ESM and CommonJS environments\n3. Update dependencies to versions that support dual module systems\n\nThis issue affects the usability of agent-kit in Next.js projects, which is a common use case for Inngest functions.",
+  "gold_answer": "The ERR_REQUIRE_ESM error comes from agent-kit importing the ESM-only @dmitryrechkin/json-schema-to-zod with require(). Upgrading to @inngest/agent-kit@0.3.1, which ships both CJS and ESM builds, resolves it.",
+  "gold_thread": "Thanks for the detailed report, @eraykeskinmac!\n\nCould you try using `@inngest/agent-kit@0.3.1`? This offers dual CJS and ESM builds so may resolve the issue immediately.\n\nIf not, we can ship another change to handle this case.\n---\nAwesome! Thanks for testing and glad it's looking good, @eraykeskinmac! 🙌 \n\ncc @MonsterDeveloper - thanks for the PR 🙂 ",
+  "cleaned": {
+   "question": "Using @inngest/agent-kit v0.2.2 or v0.3.0 with Next.js 15.1.3, inngest 3.31.11, React 19.0.0, and Node 20.15.1, the server fails with ERR_REQUIRE_ESM because agent-kit's dist/agent.js calls require() on @dmitryrechkin/json-schema-to-zod, which is an ESM-only package (v0.1.2 works). Workarounds tried (transpilePackages, experimental.esmExternals 'loose', webpack changes, a bridge module using inngest.step.ai.infer, downgrading to v0.2.2) did not fully fix it, and the user asks how to resolve this or what agent-kit change is needed.",
+   "queries": [
+    "agent-kit ERR_REQUIRE_ESM json-schema-to-zod",
+    "agent-kit v0.3.0 Next.js require ESM",
+    "inngest agent-kit CommonJS import error"
+   ],
+   "codeTerms": [
+    "ERR_REQUIRE_ESM",
+    "json-schema-to-zod",
+    "@inngest/agent-kit",
+    "createAgent",
+    "step.ai.infer"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "This is an agent-kit packaging bug, not something your Next.js config can fully fix. agent-kit's CJS build (`dist/agent.js`) uses `require(\"@dmitryrechkin/json-schema-to-zod\")`, and newer versions of that dependency are ESM-only. Node 20.15 can't `require()` ESM (that only works unflagged from 20.19/22.12), so you get ERR_REQUIRE_ESM. `transpilePackages` and `esmExternals` don't help, because the server bundle externalizes agent-kit and Node loads it directly.\n\nOptions, in order of practicality:\n\n1. **Pin the transitive dep.** Force the working version (you said 0.1.2 works) with an override. This is the most reliable fix today:\n```json\n// package.json (npm/yarn \"resolutions\", pnpm \"pnpm.overrides\")\n\"overrides\": { \"@dmitryrechkin/json-schema-to-zod\": \"0.1.2\" }\n```\nThen reinstall and clear `.next`.\n\n2. **Upgrade Node** to ≥20.19 or 22.12+, where `require(esm)` works without a flag.\n\n3. **Bundle agent-kit instead of externalizing it.** Add `serverExternalPackages: []` and keep `transpilePackages: [\"@inngest/agent-kit\"]`. I haven't verified this one against your setup.\n\nThe upstream fix is for agent-kit to pin the dependency to a CJS-compatible version, or switch to a dual-format or bundled dependency. Please open or upvote an issue on inngest/agent-kit with your versions. I don't have a source confirming which agent-kit release fixes it.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "Docs don't cover agent-kit's ESM/CJS compatibility or known dependency-pinning workarounds for Next.js.",
+   "whyUnsure": "No doc or past fix matched this"
+  },
+  "withDocs": {
+   "text": "This is an agent-kit packaging bug, not something your Next.js config can fully fix. agent-kit's CJS build (`dist/agent.js`) uses `require(\"@dmitryrechkin/json-schema-to-zod\")`, and newer versions of that dependency are ESM-only. Node 20.15 can't `require()` ESM (that only works unflagged from 20.19/22.12), so you get ERR_REQUIRE_ESM. `transpilePackages` and `esmExternals` don't help, because the server bundle externalizes agent-kit and Node loads it directly.\n\nOptions, in order of practicality:\n\n1. **Pin the transitive dep.** Force the working version (you said 0.1.2 works) with an override. This is the most reliable fix today:\n```json\n// package.json (npm/yarn \"resolutions\", pnpm \"pnpm.overrides\")\n\"overrides\": { \"@dmitryrechkin/json-schema-to-zod\": \"0.1.2\" }\n```\nThen reinstall and clear `.next`.\n\n2. **Upgrade Node** to ≥20.19 or 22.12+, where `require(esm)` works without a flag.\n\n3. **Bundle agent-kit instead of externalizing it.** Add `serverExternalPackages: []` and keep `transpilePackages: [\"@inngest/agent-kit\"]`. I haven't verified this one against your setup.\n\nThe upstream fix is for agent-kit to pin the dependency to a CJS-compatible version, or switch to a dual-format or bundled dependency. Please open or upvote an issue on inngest/agent-kit with your versions. I don't have a source confirming which agent-kit release fixes it.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "Docs don't cover agent-kit's ESM/CJS compatibility or known dependency-pinning workarounds for Next.js.",
+   "whyUnsure": "No doc or past fix matched this"
+  },
+  "control": {
+   "text": "This is an agent-kit packaging bug, not something your Next.js config can reliably fix. agent-kit's CJS build (`dist/agent.js`) does `require(\"@dmitryrechkin/json-schema-to-zod\")`, and newer versions of that package are ESM-only. Node 20.15 can't `require()` ESM without a flag (`require(esm)` is only unflagged in Node 22.12+), so you get ERR_REQUIRE_ESM. The real fix has to come from agent-kit: pin or bundle the dependency, or switch to a dynamic `import()`. Please open an issue on the agent-kit repo with your versions.\n\nWhat to try in the meantime:\n\n1. **Pin the transitive dependency.** You said 0.1.2 works, so force it with overrides:\n```json\n{\n  \"overrides\": { \"@dmitryrechkin/json-schema-to-zod\": \"0.1.2\" }\n}\n```\nUse `resolutions` for yarn/pnpm (`pnpm.overrides` for pnpm). Then reinstall and clear `.next`. Make sure the lockfile really resolves a single copy of 0.1.2.\n\n2. **Upgrade Node to 22.12+ or 20.19+.** Both have `require(esm)` enabled by default. This is the easiest way out if you control the runtime.\n\n3. **Externalize agent-kit.** Add `serverExternalPackages: ['@inngest/agent-kit']` in next.config. That way Node loads it natively instead of webpack bundling it. `transpilePackages` and `esmExternals` don't help because the `require` happens inside agent-kit's own CJS output.\n\nI'm confident about the cause. I haven't tested these fixes against your exact versions.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "Docs don't cover ESM/CJS compatibility issues with agent-kit dependencies or the supported Node versions.",
+   "whyUnsure": "No doc or past fix matched this"
+  }
+ },
+ {
+  "source": "inngest/agent-kit#38",
+  "url": "https://github.com/inngest/agent-kit/issues/38",
+  "title": "Ollama support",
+  "created_at": "2025-01-08T14:19:50Z",
+  "question": "Hi team!\r\n\r\nDo you plan to add Ollama support in AgentKit?\r\nIt would enable me to use your product at my work. As a Swiss State we can only use LLMs locally hosted in our own infrastructure.\r\n\r\nCheers!\r\nJC\r\n",
+  "gold_answer": "Staff said Ollama support can be added given the right config options, since models are defined in the inngest-js repo under packages/inngest/src/components/ai/models and imported through AgentKit. They asked whether the Ollama endpoint is internet-facing with a base URL and auth or on a closed network, and the requester is tracking it as EXE-1407.",
+  "gold_thread": "Hey @JCPOCSIN - we can add Ollama support given the right config options. The models are currently defined in our main JS repo and imported through Agent Kit. We plan to extract those into a neutral package at some point.\r\n\r\nhttps://github.com/inngest/inngest-js/tree/main/packages/inngest/src/components/ai/models\r\n\r\nIs your Ollama model open to the internet w/ a base URL and auth, or is it on the closed network?",
+  "cleaned": {
+   "question": "Does Inngest plan to add Ollama support in AgentKit? A Swiss public-sector developer needs LLMs that are locally hosted in their own infrastructure, so AgentKit can only be used at work if it supports Ollama.",
+   "queries": [
+    "AgentKit Ollama support",
+    "AgentKit custom model adapter",
+    "Inngest AgentKit openai compatible models"
+   ],
+   "codeTerms": [
+    "createAgent",
+    "openai",
+    "AgentKit"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "AgentKit already supports Ollama, so you don't need to wait for a roadmap item. I can't speak to Inngest's future plans, but the practical answer is that it works today.\n\nOllama exposes an OpenAI-compatible API at `http://localhost:11434/v1`, or at your own internal host. AgentKit's `openai()` model helper accepts a custom `baseUrl`, so you can point it at Ollama:\n\n```ts\nimport { createAgent, openai } from \"@inngest/agent-kit\";\n\nconst agent = createAgent({\n  name: \"local-agent\",\n  system: \"You are a helpful assistant.\",\n  model: openai({\n    model: \"llama3.1\",\n    baseUrl: \"http://your-ollama-host:11434/v1\",\n    apiKey: \"ollama\", // required by the client, ignored by Ollama\n  }),\n});\n```\n\nUse a model that supports tool calling if your agent uses tools. Quality varies a lot between local models.\n\nFor the data-residency requirement, you can also self-host the Inngest server, so orchestration and state stay in your own infrastructure. Your functions already run on your own compute. None of the provided sources cover this directly, so I'm going from my own knowledge of AgentKit. Please check the `baseUrl` option against the current AgentKit model docs before sending.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "The docs should have a page on using AgentKit with Ollama or other local OpenAI-compatible models (baseUrl config), and on running fully self-hosted.",
+   "whyUnsure": null
+  },
+  "withDocs": {
+   "text": "AgentKit already supports Ollama, so you don't need to wait for a roadmap item. I can't speak to Inngest's future plans, but the practical answer is that it works today.\n\nOllama exposes an OpenAI-compatible API at `http://localhost:11434/v1`, or at your own internal host. AgentKit's `openai()` model helper accepts a custom `baseUrl`, so you can point it at Ollama:\n\n```ts\nimport { createAgent, openai } from \"@inngest/agent-kit\";\n\nconst agent = createAgent({\n  name: \"local-agent\",\n  system: \"You are a helpful assistant.\",\n  model: openai({\n    model: \"llama3.1\",\n    baseUrl: \"http://your-ollama-host:11434/v1\",\n    apiKey: \"ollama\", // required by the client, ignored by Ollama\n  }),\n});\n```\n\nUse a model that supports tool calling if your agent uses tools. Quality varies a lot between local models.\n\nFor the data-residency requirement, you can also self-host the Inngest server, so orchestration and state stay in your own infrastructure. Your functions already run on your own compute. None of the provided sources cover this directly, so I'm going from my own knowledge of AgentKit. Please check the `baseUrl` option against the current AgentKit model docs before sending.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "The docs should have a page on using AgentKit with Ollama or other local OpenAI-compatible models (baseUrl config), and on running fully self-hosted.",
+   "whyUnsure": null
+  },
+  "control": {
+   "text": "I can't speak to Inngest's roadmap, so I can't confirm a plan or date for a native Ollama adapter. But they don't need to wait for one.\n\nAgentKit's model adapters include OpenAI, Anthropic, Gemini, and Grok. The OpenAI adapter takes a `baseUrl`. Ollama exposes an OpenAI-compatible API at `/v1`, so you can point that adapter at your own Ollama server:\n\n```ts\nimport { createAgent, openai } from \"@inngest/agent-kit\";\n\nconst agent = createAgent({\n  name: \"local-agent\",\n  system: \"You are a helpful assistant.\",\n  model: openai({\n    model: \"llama3.1\",\n    baseUrl: \"http://your-ollama-host:11434/v1\",\n    apiKey: \"ollama\", // required by the client, ignored by Ollama\n  }),\n});\n```\n\nNotes:\n- Tool calling depends on the model. Use one that supports tools, such as Llama 3.1 or Qwen 2.5. Smaller models are often unreliable at it.\n- Inngest functions run in your own infrastructure, so you can keep both the Inngest worker and the LLM on-prem. The Inngest server can also be self-hosted if the Swiss public-sector team needs that.\n\nPlease check the current AgentKit model docs for the exact option names. For a native adapter, I'd suggest opening a GitHub issue on the AgentKit repo.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "The AgentKit docs should say how to use local or OpenAI-compatible models such as Ollama through the openai adapter's baseUrl.",
+   "whyUnsure": "No doc or past fix matched this: roadmap unknown, and the baseUrl option name is from memory."
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1932",
+  "url": "https://github.com/orgs/inngest/discussions/1932",
+  "title": "Self-Hosted dashboard authentication",
+  "created_at": "2024-11-01T05:23:42Z",
+  "question": "Hi everyone,\r\n\r\nI have a question regarding the security of the dashboard UI when self-hosting:\r\n\r\n- Does Inngest provide built-in authentication mechanisms for the dashboard, or should we implement our own authentication layer? and if yes, how?\r\n- Are there any specific configurations or middleware you suggest to restrict access to authorized users only?\r\n\r\nI want to ensure that the dashboard is secure and accessible only to authorized personnel within our organization.\r\n\r\nAny guidance or documentation you could provide would be greatly appreciated!\r\n\r\nThanks in advance for your help.",
+  "gold_answer": "Self-hosted Inngest does not include built-in dashboard auth. The recommended workaround is to put the dashboard behind a reverse proxy or load balancer with authentication (such as nginx basic auth), and to route the event/API endpoints on a separate domain so Inngest can still reach them. Staff noted auth support is not currently planned, but contributions to the inngest/inngest repo are welcome.",
+  "gold_thread": "Currently, self-hosted Inngest doesn't provide auth. The best path forward for now is @sathishkannan162's suggestion. \r\n\r\nIf we did add support for auth, what type of setup would you like to see? We could potentially add Github or Google auth as an option, but it would take some time. We'd also be open to contributions in our [inngest](https://github.com/inngest/inngest) repo if you're interested.",
+  "cleaned": {
+   "question": "When self-hosting Inngest, does the dashboard UI have built-in authentication, or do we need to implement our own authentication layer in front of it? If built-in auth exists, how is it configured, and what middleware or configuration do you recommend to restrict dashboard access to authorized users within our organization?",
+   "queries": [
+    "self-hosted dashboard authentication",
+    "Inngest dashboard access control",
+    "Inngest signing key dashboard"
+   ],
+   "codeTerms": [
+    "INNGEST_SIGNING_KEY",
+    "INNGEST_DEV",
+    "signingKey"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "No. As far as I know, the self-hosted Inngest dashboard UI (served by `inngest start` / the Dev Server) has no built-in user login or SSO. Put your own authentication layer in front of it. None of the provided sources cover dashboard auth, so this is from my own knowledge.\n\nWhat I'd recommend:\n- **Don't expose the UI port publicly.** Keep it on a private network or VPN. The UI and API listen on 8288 by default.\n- **Use an authenticating reverse proxy** in front of 8288, such as oauth2-proxy, Pomerium, Cloudflare Access, Tailscale or an nginx/Traefik forward-auth setup. Connect it to your IdP (Okta, Google Workspace, etc.) and restrict access to your org's groups or domain.\n- **Split the traffic.** Your workers and event senders shouldn't go through SSO. Route the event API (`/e/<key>`) and the SDK/executor traffic on a separate path or port, or keep it internal.\n\nKeys for service traffic, which are separate from dashboard access:\n- Set `--event-key` and `--signing-key` on `inngest start`. SDKs then use `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` [3][8]. These authenticate SDK-to-server requests, not users viewing the dashboard.\n- The Connect WebSocket gateway is on port `8289` [1]. Keep it reachable only from your workers' network.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Connect (workers)",
+     "url": "https://www.inngest.com/docs/setup/connect"
+    },
+    {
+     "n": 3,
+     "title": "Environment Variables",
+     "url": "https://www.inngest.com/docs/sdk/environment-variables"
+    },
+    {
+     "n": 8,
+     "title": "Source code: inngest-js/packages/inngest/src/helpers/consts.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/57f8adc69a956e466494ecdac0a72faa6399257f/packages/inngest/src/helpers/consts.ts#L24"
+    }
+   ],
+   "confidence": 0.72,
+   "docsGap": "The self-hosting docs should state that the dashboard has no built-in user authentication and describe a recommended pattern for securing it, such as a reverse proxy with SSO.",
+   "whyUnsure": null
+  },
+  "withDocs": {
+   "text": "No. As far as I know, the self-hosted Inngest dashboard UI (served by `inngest start` / the Dev Server) has no built-in user login or SSO. Put your own authentication layer in front of it. None of the provided sources cover dashboard auth, so this is from my own knowledge.\n\nWhat I'd recommend:\n- **Don't expose the UI port publicly.** Keep it on a private network or VPN. The UI and API listen on 8288 by default.\n- **Use an authenticating reverse proxy** in front of 8288, such as oauth2-proxy, Pomerium, Cloudflare Access, Tailscale or an nginx/Traefik forward-auth setup. Connect it to your IdP (Okta, Google Workspace, etc.) and restrict access to your org's groups or domain.\n- **Split the traffic.** Your workers and event senders shouldn't go through SSO. Route the event API (`/e/<key>`) and the SDK/executor traffic on a separate path or port, or keep it internal.\n\nKeys for service traffic, which are separate from dashboard access:\n- Set `--event-key` and `--signing-key` on `inngest start`. SDKs then use `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` [3][8]. These authenticate SDK-to-server requests, not users viewing the dashboard.\n- The Connect WebSocket gateway is on port `8289` [1]. Keep it reachable only from your workers' network.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Connect (workers)",
+     "url": "https://www.inngest.com/docs/setup/connect"
+    },
+    {
+     "n": 3,
+     "title": "Environment Variables",
+     "url": "https://www.inngest.com/docs/sdk/environment-variables"
+    },
+    {
+     "n": 8,
+     "title": "Source code: inngest-js/packages/inngest/src/helpers/consts.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/57f8adc69a956e466494ecdac0a72faa6399257f/packages/inngest/src/helpers/consts.ts#L24"
+    }
+   ],
+   "confidence": 0.72,
+   "docsGap": "The self-hosting docs should state that the dashboard has no built-in user authentication and describe a recommended pattern for securing it, such as a reverse proxy with SSO.",
+   "whyUnsure": null
+  },
+  "control": {
+   "text": "**No, the self-hosted Inngest dev server/dashboard UI has no built-in user authentication (no login, users, or SSO).** Put your own auth layer in front of it.\n\nWhat Inngest does provide is key-based auth for the *API* surface, not the UI:\n- `--event-key` (events ingest) and `--signing-key` (request signing between Inngest and your SDK served functions) on `inngest start`. Set these (or `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`) for any real deployment. Signing keys should be hex strings with an even number of characters.\n- These do not gate who can open the dashboard UI.\n\n**Recommended setup:**\n1. Don't expose the Inngest ports directly. Bind it to a private network or localhost, and expose only through a reverse proxy.\n2. Use an authenticating proxy for the UI/API port (8288 by default), such as oauth2-proxy, Pomerium, Cloudflare Access, Tailscale, or nginx/Traefik `forward-auth` to your IdP (Okta, Google, Entra). Restrict by group or email domain.\n3. Keep the event-ingest path (`/e/<key>`) and the SDK connect/serve traffic separate from the human-facing UI. Allow those through with key auth or network policy, since machines can't do SSO flows. Be careful that proxy rules for the UI don't block them.\n4. Add network-level controls (security groups, VPN, or mTLS) as a second layer.\n\nNote that I'm answering from general knowledge. Check the current self-hosting docs in case auth features were added recently.",
+   "citations": [],
+   "confidence": 0.72,
+   "docsGap": "Self-hosting docs should state explicitly that the dashboard UI has no built-in auth and give a recommended reverse-proxy setup.",
+   "whyUnsure": null
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #3683",
+  "url": "https://github.com/orgs/inngest/discussions/3683",
+  "title": "Question about Pro plan concurrency limits (100 concurrent steps feels very low?)",
+  "created_at": "2026-02-13T05:50:19Z",
+  "question": "Hi team,\r\n\r\nI’m evaluating Inngest for LLM-heavy workloads, and I’m struggling to understand the reasoning behind the Pro plan concurrency limit of 100 concurrent steps.\r\n\r\nFrom my perspective, 100 concurrent executing steps (account-wide) feels extremely low for modern AI / LLM-driven systems. If each step represents something like an in-flight LLM call, this effectively caps parallelism at 100 across the entire environment.\r\n\r\nFor batch-style processing or even moderately high-traffic SaaS workloads, this seems like a very tight ceiling. It makes me wonder:\r\n- What’s the design philosophy behind keeping concurrency this low?\r\n- Is Inngest primarily optimized for orchestration rather than high-parallel compute?\r\n- Are most production users expected to stay well under 100 concurrent active steps?\r\n- In what kinds of real-world workloads does 100 concurrency not become a bottleneck?\r\n\r\nFrom the outside, it feels like this limit removes much of the benefit of using Inngest for large-scale fan-out workflows (e.g., thousands of LLM tasks). I’d love to understand the architectural or economic reasoning behind this constraint.\r\n\r\nAppreciate any insight into how the team thinks about concurrency and scaling at higher volumes.\r\n\r\nThanks!",
+  "gold_answer": "The Pro plan includes 100 concurrent steps as a base amount, but concurrency is not capped at 100. Customers can add on more concurrency as needed, and teams at high scale can move to Enterprise/custom plans for the highest loads.",
+  "gold_thread": "Hi @softmarshmallow, \r\nThe Pro plan _starts_ at 100 concurrent steps, but you can choose to add on as much more concurrency that you need. 100 is not a limit; it's the base included amount.\r\n\r\nMany of our customers add on additional concurrency to handle the types of workloads that they need. Also, many customers run high throughput, highly parallelized workloads, but they often increase their concurrency and many teams at high scale will move to enterprise/custom plans for the highest load scenarios. \r\n\r\nThe Pro plan aims to be a plan that works for many types of companies, enabling folks to increase certain areas via add-ons (ex. concurrency, advanced o11y/extended history, support) and scale usage (e.g. executions) over time with tiers that get cheaper as you scale. Some teams have important low throughput workloads and others have high throughput or bursty workloads and need more concurrency. As additional concurrent load requires additional capacity on our servers, we associate a cost with this.\r\n\r\nAs a question for you, was it clear from our pricing page that it's possible to add on more concurrent steps/capacity? Or not?\r\n\r\nThanks for your question!",
+  "cleaned": {
+   "question": "Why does the Inngest Pro plan cap account-wide concurrency at 100 concurrent steps, and is that limit a bottleneck for LLM-heavy workloads with large fan-out (thousands of in-flight LLM calls)? The asker wants to know the design and economic reasoning, whether Inngest is optimized for orchestration rather than high-parallel compute, what concurrency production users typically stay under, and which workloads avoid hitting 100.",
+   "queries": [
+    "Inngest Pro plan concurrency limits",
+    "Inngest concurrency steps per environment",
+    "Inngest fan-out batching high concurrency"
+   ],
+   "codeTerms": [
+    "concurrency",
+    "maxConcurrency",
+    "concurrency limit",
+    "fan-out",
+    "step.run"
+   ]
+  },
+  "nSources": 11,
+  "firstDraft": {
+   "text": "I can't point to a source that explains why the Pro plan is set at 100, and I'm not confident of the exact figure. The docs only say the max `limit` \"is dictated by your account's plan\" [1][2]. Check the pricing page for the current Pro number before replying. Inngest hasn't published the design or economic reasoning, and I don't have data on what concurrency production users typically stay under, so I wouldn't state either as fact.\n\nWhat the sources do support:\n- Concurrency counts running **steps**, not runs [1]. Steps that are waiting, sleeping, or waiting on events don't count. Thousands of in-flight runs can exist as long as fewer than the cap are executing at once.\n- Concurrency limits are plan-based and enforced by Inngest's queue. Self-hosted/dev defaults are much higher: the dev server hit 100 parallel steps without throttling [5], and the default function limit in the source is 1,000 [10].\n- Over the cap, work queues rather than failing. Throughput is bounded by `cap / average step duration`.\n\nFor LLM fan-out, the cap is a real bottleneck if each step holds a slot for the full LLM call. 5,000 calls of 10s each at a cap of 100 would take roughly 500s. Ways to reduce the impact:\n- Batch several prompts into one step.\n- Use provider batch APIs and wait for the result with `step.waitForEvent`.\n- Keep the long LLM call outside the step slot.\n\nIf you need thousands of truly parallel steps, the practical route is a higher-concurrency Enterprise plan. Ask sales or support about that.\n\nOn \"orchestration vs. compute\": Inngest does durable orchestration, and your workers run the compute. That's my general understanding, not something these sources state.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Concurrency management",
+     "url": "https://www.inngest.com/docs/guides/concurrency"
+    },
+    {
+     "n": 2,
+     "title": "Managing concurrency",
+     "url": "https://www.inngest.com/docs/functions/concurrency"
+    },
+    {
+     "n": 5,
+     "title": "Local Concurrency Limit",
+     "url": "https://github.com/inngest/inngest/issues/2093",
+     "fixes": [
+      {
+       "title": "PR #2107: Enable user to configure the number of queue workers",
+       "url": "https://github.com/inngest/inngest/pull/2107"
+      }
+     ]
+    },
+    {
+     "n": 10,
+     "title": "Source code: inngest/pkg/consts/consts.go",
+     "url": "https://github.com/inngest/inngest/blob/616164668b74f6cc182266afec65c8dacac373f9/pkg/consts/consts.go#L68"
+    }
+   ],
+   "confidence": 0.35,
+   "docsGap": "Docs don't list per-plan concurrency limits next to the concurrency docs, nor explain how to design high-fan-out LLM workloads around the cap.",
+   "whyUnsure": "Docs only partly cover this: no source gives the plan's cap rationale, economics, or typical production usage."
+  },
+  "withDocs": {
+   "text": "I can't point to a source that explains why the Pro plan is set at 100, and I'm not confident of the exact figure. The docs only say the max `limit` \"is dictated by your account's plan\" [1][2]. Check the pricing page for the current Pro number before replying. Inngest hasn't published the design or economic reasoning, and I don't have data on what concurrency production users typically stay under, so I wouldn't state either as fact.\n\nWhat the sources do support:\n- Concurrency counts running **steps**, not runs [1]. Steps that are waiting, sleeping, or waiting on events don't count. Thousands of in-flight runs can exist as long as fewer than the cap are executing at once.\n- Concurrency limits are plan-based and enforced by Inngest's queue. Self-hosted/dev defaults are much higher: the dev server hit 100 parallel steps without throttling [5], and the default function limit in the source is 1,000 [10].\n- Over the cap, work queues rather than failing. Throughput is bounded by `cap / average step duration`.\n\nFor LLM fan-out, the cap is a real bottleneck if each step holds a slot for the full LLM call. 5,000 calls of 10s each at a cap of 100 would take roughly 500s. Ways to reduce the impact:\n- Batch several prompts into one step.\n- Use provider batch APIs and wait for the result with `step.waitForEvent`.\n- Keep the long LLM call outside the step slot.\n\nIf you need thousands of truly parallel steps, the practical route is a higher-concurrency Enterprise plan. Ask sales or support about that.\n\nOn \"orchestration vs. compute\": Inngest does durable orchestration, and your workers run the compute. That's my general understanding, not something these sources state.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Concurrency management",
+     "url": "https://www.inngest.com/docs/guides/concurrency"
+    },
+    {
+     "n": 2,
+     "title": "Managing concurrency",
+     "url": "https://www.inngest.com/docs/functions/concurrency"
+    },
+    {
+     "n": 5,
+     "title": "Local Concurrency Limit",
+     "url": "https://github.com/inngest/inngest/issues/2093",
+     "fixes": [
+      {
+       "title": "PR #2107: Enable user to configure the number of queue workers",
+       "url": "https://github.com/inngest/inngest/pull/2107"
+      }
+     ]
+    },
+    {
+     "n": 10,
+     "title": "Source code: inngest/pkg/consts/consts.go",
+     "url": "https://github.com/inngest/inngest/blob/616164668b74f6cc182266afec65c8dacac373f9/pkg/consts/consts.go#L68"
+    }
+   ],
+   "confidence": 0.35,
+   "docsGap": "Docs don't list per-plan concurrency limits next to the concurrency docs, nor explain how to design high-fan-out LLM workloads around the cap.",
+   "whyUnsure": "Docs only partly cover this: no source gives the plan's cap rationale, economics, or typical production usage."
+  },
+  "control": {
+   "text": "I can't point to a published rationale for the 100 figure, so the \"why\" below is inference, not an official statement. The limits are also plan-dependent and have changed over time, so check the current pricing page and your account's plan settings.\n\n**Why a cap exists (inference):** Concurrency is a step-level resource on Inngest's side. Each running step is an in-flight HTTP request to your infrastructure, tracked and scheduled by Inngest. Plan-level caps keep multi-tenant capacity fair and tie price to usage. Higher tiers and Enterprise raise the cap, which is a normal pricing lever.\n\n**Is it a bottleneck for LLM fan-out?** It can be. The cap counts concurrently *executing* steps, not queued work. If you fan out 5,000 `step.run` LLM calls, about 100 run at a time and the rest wait in the queue. Throughput is roughly 100 ÷ average call latency. With 10s calls that's about 10 calls/sec. Nothing fails, but wall-clock time grows. If you truly need thousands of calls in flight at once, the Pro cap is too low and you'd need a higher or custom limit (Enterprise).\n\n**Orchestration vs. compute:** Inngest is built for durable orchestration, meaning retries, state, and scheduling. Your own code does the compute. Long LLM calls still hold a step slot while they wait, which is why they hit the cap quickly.\n\n**Ways to stay under or work around it:**\n- Batch several prompts into one step, or use provider batch APIs for non-urgent work.\n- Use `step.ai.infer`. Inngest makes the request, so your function isn't held open during the wait. I'm not certain whether it counts against the concurrency limit, so verify that.\n- Set per-function `concurrency` keys so one workload doesn't starve others.\n- Use throttling or rate limits to match your provider's TPM/RPM limits. These are often the real bottleneck before 100 anyway.\n\n**What production users typically stay under:** I don't have data on this, so I won't guess a number. Ask support or sales for benchmarks. Workloads that rarely hit 100 are event-driven pipelines, short steps, and moderate fan-out.",
+   "citations": [],
+   "confidence": 0.4,
+   "docsGap": "The docs don't explain the rationale for plan concurrency limits, whether step.ai.infer waits count against them, or typical concurrency levels for LLM fan-out workloads.",
+   "whyUnsure": "No doc or past fix matched this: the design rationale and typical user concurrency aren't documented in the sources provided."
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #3100",
+  "url": "https://github.com/orgs/inngest/discussions/3100",
+  "title": "support waiting on multiple events in step",
+  "created_at": "2025-10-08T04:13:30Z",
+  "question": "ref this 2024 issue: https://github.com/inngest/inngest/issues/1315#issuecomment-2153479629\r\n\r\n@jpwilliams suggested a user-land solution by managing Promises\r\n\r\na common scenario for me is waiting on ack of success or fail of a 3rd service webhooks, like:\r\n\r\n```ts\r\nconst twilioWhatsApp = await step.invoke(\"whatsapp-send\", ...)\r\n\r\nawait Promise.race([\r\n  step.waitForEvent(\"whatsapp-reply\", {\r\n    event: \"whatsapp_reply\",\r\n    timeout: TIMEOUT_MAX,\r\n    if: `\"${event.data.id}\" == async.data.id && \"${event.data.target}\" == async.data.target`,\r\n  }),\r\n  step.waitForEvent(\"twilio-outbound-failed\", {\r\n    event: \"twilio/outbound_failed\",\r\n    timeout: TIMEOUT_MAX,\r\n    if: `\"${twilioWhatsApp.sid}\" == async.data.MessageSid`,\r\n  }),\r\n]);\r\n```\r\n\r\ni'm curious about what's the official suggestion from inngest team?",
+  "gold_answer": "Promise.race() works for waiting on multiple events in a step, and Inngest's suggested waitForAny() helper can optimize this by avoiding re-running the function as often. If timeouts are aligned, the two approaches are basically equivalent; with differing timeouts, waitForAny() won't resolve early and instead returns null when a shorter timeout fires.",
+  "gold_thread": "Hi @oieduardorabelo - I'll answer your question in #315 here!\r\n\r\nYou can totally use `Promise.race()` too! Using the `waitForAny()` I suggested in the other thread _does_ give Inngest the chance to optimize the execution of that function a little, as `Promise.race()` requires that we're revisiting your function as often as we can.\r\n\r\nIn addition, if in this case you had differing timeouts, the `waitForAny()` snippet wouldn't resolve early, though with if you had a race with a 10s and a 20s timeout and the 10s timed out, that'd resolve with `null`.\r\n\r\nIt's small differences really; if you're happy with aligning timeouts then it's basically the same!",
+  "cleaned": {
+   "question": "What is Inngest's official recommendation for waiting on whichever of several events arrives first inside a step? The developer wants to wait for a WhatsApp reply (event \"whatsapp_reply\") or a Twilio failure (event \"twilio/outbound_failed\") after step.invoke(\"whatsapp-send\"), and currently uses Promise.race over two step.waitForEvent calls with TIMEOUT_MAX and `if` expressions matching on event.data.id, event.data.target, and async.data.MessageSid, as the 2024 issue #1315 only offered a userland Promise workaround.",
+   "queries": [
+    "step.waitForEvent multiple events",
+    "Promise.race step.waitForEvent",
+    "waitForEvent race multiple events"
+   ],
+   "codeTerms": [
+    "step.waitForEvent",
+    "Promise.race",
+    "step.invoke",
+    "waitForEvent"
+   ]
+  },
+  "nSources": 11,
+  "firstDraft": {
+   "text": "There's no dedicated \"wait for any of several events\" API in the sources I have. `step.waitForEvent` takes a single `event` [3], and the multi-event feature requests (#1046, #1315) were closed with a userland workaround, not a new primitive [5][6]. The maintainer's answer on #1315 is still the recommended pattern: race the waits with regular promise handling [6]. Your `Promise.race` over two `waitForEvent` calls is that pattern.\n\nThings to watch:\n- **Race semantics:** the docs say that with optimized parallelism (the default in v4), `Promise.race` waits for all parallel steps to resolve. To get early resolution, wrap the race in `group.parallel()`. Losing steps are not cancelled [1]. Your losing `waitForEvent` stays pending until it matches or times out, so use a realistic timeout instead of `TIMEOUT_MAX`.\n- **Matching:** in v4 you can use `match: \"data.id\"` when the field name is the same on both events. Use `if` when the fields differ, as with `async.data.MessageSid` [3][4].\n\n```ts\nconst result = await group.parallel(async () =>\n  Promise.race([\n    step.waitForEvent(\"reply\", { event: \"whatsapp_reply\", timeout: \"1h\", if: \"event.data.id == async.data.id\" }),\n    step.waitForEvent(\"fail\", { event: \"twilio/outbound_failed\", timeout: \"1h\", if: \"event.data.target == async.data.target\" }),\n  ])\n);\n```\n\nIf either event can't be correlated to the run, consider making the sender emit one normalized event instead.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Step parallelism",
+     "url": "https://www.inngest.com/docs/guides/step-parallelism"
+    },
+    {
+     "n": 3,
+     "title": "Wait for event",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-wait-for-event"
+    },
+    {
+     "n": 4,
+     "title": "Human-in-the-loop (HITL)",
+     "url": "https://www.inngest.com/docs/ai-patterns/human-in-the-loop"
+    },
+    {
+     "n": 5,
+     "title": "Add multiple events support to waitForEvent",
+     "url": "https://github.com/inngest/inngest/issues/1046",
+     "fixes": []
+    },
+    {
+     "n": 6,
+     "title": "feat: Add support of waitForMultipleEvents",
+     "url": "https://github.com/inngest/inngest/issues/1315",
+     "fixes": []
+    }
+   ],
+   "confidence": 0.6,
+   "docsGap": "The docs don't have a documented \"wait for the first of several events\" pattern. They also don't say what happens to the losing waitForEvent in a race.",
+   "whyUnsure": null
+  },
+  "withDocs": {
+   "text": "There's no dedicated \"wait for any of several events\" API in the sources I have. `step.waitForEvent` takes a single `event` [3], and the multi-event feature requests (#1046, #1315) were closed with a userland workaround, not a new primitive [5][6]. The maintainer's answer on #1315 is still the recommended pattern: race the waits with regular promise handling [6]. Your `Promise.race` over two `waitForEvent` calls is that pattern.\n\nThings to watch:\n- **Race semantics:** the docs say that with optimized parallelism (the default in v4), `Promise.race` waits for all parallel steps to resolve. To get early resolution, wrap the race in `group.parallel()`. Losing steps are not cancelled [1]. Your losing `waitForEvent` stays pending until it matches or times out, so use a realistic timeout instead of `TIMEOUT_MAX`.\n- **Matching:** in v4 you can use `match: \"data.id\"` when the field name is the same on both events. Use `if` when the fields differ, as with `async.data.MessageSid` [3][4].\n\n```ts\nconst result = await group.parallel(async () =>\n  Promise.race([\n    step.waitForEvent(\"reply\", { event: \"whatsapp_reply\", timeout: \"1h\", if: \"event.data.id == async.data.id\" }),\n    step.waitForEvent(\"fail\", { event: \"twilio/outbound_failed\", timeout: \"1h\", if: \"event.data.target == async.data.target\" }),\n  ])\n);\n```\n\nIf either event can't be correlated to the run, consider making the sender emit one normalized event instead.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Step parallelism",
+     "url": "https://www.inngest.com/docs/guides/step-parallelism"
+    },
+    {
+     "n": 3,
+     "title": "Wait for event",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-wait-for-event"
+    },
+    {
+     "n": 4,
+     "title": "Human-in-the-loop (HITL)",
+     "url": "https://www.inngest.com/docs/ai-patterns/human-in-the-loop"
+    },
+    {
+     "n": 5,
+     "title": "Add multiple events support to waitForEvent",
+     "url": "https://github.com/inngest/inngest/issues/1046",
+     "fixes": []
+    },
+    {
+     "n": 6,
+     "title": "feat: Add support of waitForMultipleEvents",
+     "url": "https://github.com/inngest/inngest/issues/1315",
+     "fixes": []
+    }
+   ],
+   "confidence": 0.6,
+   "docsGap": "The docs don't have a documented \"wait for the first of several events\" pattern. They also don't say what happens to the losing waitForEvent in a race.",
+   "whyUnsure": null
+  },
+  "control": {
+   "text": "There's no dedicated \"wait for any of several events\" primitive that I'm aware of. As far as I know, the recommended pattern is still **`Promise.race` over multiple `step.waitForEvent` calls**. Each `waitForEvent` is its own memoized step, so the race is deterministic across replays. Your approach is the supported way to do it.\n\nThings to tighten up:\n\n1. **Register the waits before the trigger.** Start both `waitForEvent` promises *before* you `await step.invoke(\"whatsapp-send\")`. Otherwise a fast reply or failure can arrive before the waiter exists and be missed. Use `Promise.all([invokePromise, racePromise])`, or create the promises first and await them afterward.\n2. **Use a real timeout.** `timeout` takes a duration string, number of ms, or Date. A sensible bound (e.g. `\"24h\"`) is better than `TIMEOUT_MAX`, because the losing waiter stays pending until it times out or matches.\n3. **Match with `if`.** Use `event.data.x == async.data.y`. Make sure both sides carry the correlation ID, for example by passing your own ID through the send step.\n4. **Handle null.** A timed-out `waitForEvent` returns `null`, so check which promise won by inspecting the result's `name`.\n\n```ts\nconst reply = step.waitForEvent(\"wait-reply\", { event: \"whatsapp_reply\", timeout: \"24h\", if: \"event.data.id == async.data.id\" });\nconst fail = step.waitForEvent(\"wait-fail\", { event: \"twilio/outbound_failed\", timeout: \"24h\", if: \"event.data.target == async.data.target\" });\nconst [, result] = await Promise.all([step.invoke(\"whatsapp-send\", {...}), Promise.race([reply, fail])]);\n```\n\nI'm not certain whether newer SDK versions have added a multi-event wait, so check the current docs and changelog.",
+   "citations": [],
+   "confidence": 0.55,
+   "docsGap": "The docs should explicitly describe the Promise.race pattern over multiple step.waitForEvent calls, including registering the waits before the triggering step.",
+   "whyUnsure": "No doc or past fix matched this: no sources provided, and I can't confirm whether a newer SDK added a native multi-event wait."
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #1347",
+  "url": "https://github.com/orgs/inngest/discussions/1347",
+  "title": "Serve handler working after I call /api/inngest but dev server and functions not recognized",
+  "created_at": "2024-05-12T05:31:02Z",
+  "question": "As you can see calling the endpoint is working:\r\n![image](https://github.com/inngest/inngest/assets/88579001/b0c22dc8-c24c-4af3-9874-5f601c64d239)\r\n\r\n\r\n\r\nbut when I try to sync app/detect functions they are not recognized. I get `We could not reach your URL. Please verify that your URL is correct and check your server logs.`\r\n\r\nmy api/index.ts:\r\n`\r\nimport {generateContent} from './inngest/generateContent.js';\r\nimport { inngest } from \"./inngest/client.js\";\r\nimport { serve } from \"inngest/express\";\r\n\r\napp.use(\"/api/inngest\", express.json());\r\napp.use(\"/api/inngest\", serve({client: inngest, functions: [generateContent] as any}));`\r\n\r\nmy api/inngest/index.ts:\r\n`export { inngest } from \"./client.js\";\r\n\r\nimport { generateContent } from \"./generateContent.js\";\r\nimport { Request, Response } from 'express';\r\n\r\n\r\nexport default async (req: Request, res: Response) => {\r\n  try {\r\n    // const event = { /* construct event object from req if needed */ };\r\n    const hand = await generateContent;\r\n\r\n    // console.log(req);\r\n    res.json(hand);\r\n\r\n  } catch (error) {\r\n    console.error('Error processing image:', error);\r\n    res.status(500).send('Error processing image');\r\n  }\r\n};\r\n`\r\n\r\nand part of my /api/inngest/generateContent.ts:\r\n`export const generateContent = inngest.createFunction(\r\n  { id: \"generate-content\" },\r\n  { event: \"generateContent\" },\r\n  async ({ event }) => {...`\r\n  \r\n  Why are they not recognized?",
+  "gold_answer": "The user's serve() setup and function definitions looked correct to staff. The \"could not reach your URL\" error points to something blocking Inngest from reaching the endpoint, such as deployment protection (e.g., Vercel) on the URL. Staff asked whether INNGEST_SIGNING_KEY is set and suggested contacting support so they can pull logs and see the exact response the server returns.",
+  "gold_thread": "Hey @mikececco - Your function and `serve` code look correct. I'm confused about the function including `export default async (req: Request, res: Response) ` - what is that code? It doesn't look like any Inngest code so maybe it's something else.\r\n\r\nWith that error, it seems there might be some sort of protection (e.g. Vercel deployment protection) or otherwise on your URL. \r\n\r\nDo you have your `INNGEST_SIGING_KEY` set? If you are using Inngest cloud, we can pull logs to try to help debug what the exact response from your server is (hello@inngest.com). \r\n\r\nIf you already sorted it out, please let us know what the issue was!",
+  "cleaned": {
+   "question": "An Express app mounts Inngest's serve() from \"inngest/express\" at app.use(\"/api/inngest\", ...) with functions: [generateContent] (created via inngest.createFunction({ id: \"generate-content\" }, { event: \"generateContent\" }, ...)), and the endpoint responds, but syncing in the Dev Server fails with \"We could not reach your URL. Please verify that your URL is correct and check your server logs,\" so the functions are not recognized. Why are the functions not recognized, and what is causing the unreachable URL?",
+   "queries": [
+    "inngest express serve mount path",
+    "Dev Server could not reach your URL",
+    "inngest serve servePath express"
+   ],
+   "codeTerms": [
+    "We could not reach your URL",
+    "servePath",
+    "createFunction",
+    "inngest/express"
+   ]
+  },
+  "nSources": 10,
+  "firstDraft": {
+   "text": "The most likely cause is that the Dev Server can't reach your app at the URL it's trying, which is a different problem from the functions not being recognized. The functions only show up after a successful sync, so the second follows from the first.\n\nCheck these in order:\n\n1. **Missing `express.json()`.** Inngest's Express handler needs a body parser: `app.use(express.json())` before `app.use(\"/api/inngest\", serve({ client: inngest, functions: [generateContent] }))`. Without it, the POST/PUT sync request can fail even though a GET to the endpoint returns the dev page.\n2. **Wrong URL or port.** Point the Dev Server at your app explicitly: `npx inngest-cli@latest dev -u http://localhost:PORT/api/inngest` [2]. Use your Express port, not 3000 unless that's what you listen on. Auto-discovery only scans common ports.\n3. **Dev Server in Docker, or app in Docker.** `localhost` then points at the wrong machine. Use `http://host.docker.internal:PORT/api/inngest` [2].\n4. **Server errors during sync.** Look at your Express logs when you click sync. A thrown error, a body-size limit, or a proxy or middleware (auth, CORS, redirect) on `/api/inngest` will produce this same message.\n5. **Production mode.** If `NODE_ENV=production` or `INNGEST_DEV` isn't set, the SDK may try to run in cloud mode. Set `INNGEST_DEV=1` locally.\n\nSeparately, your function is fine. The trigger `{ event: \"generateContent\" }` is valid, though names like `app/generate.content` are conventional.",
+   "citations": [
+    {
+     "n": 2,
+     "title": "Get started",
+     "url": "https://www.inngest.com/docs/getting-started/index"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The docs don't list troubleshooting steps for the \"We could not reach your URL\" Dev Server sync error, such as the express.json() requirement and port or Docker mismatches.",
+   "whyUnsure": "Needs info from the user's account or logs: the Dev Server URL, Express port, and server logs during sync would pinpoint it."
+  },
+  "withDocs": {
+   "text": "The most likely cause is that the Dev Server can't reach your app at the URL it's trying, which is a different problem from the functions not being recognized. The functions only show up after a successful sync, so the second follows from the first.\n\nCheck these in order:\n\n1. **Missing `express.json()`.** Inngest's Express handler needs a body parser: `app.use(express.json())` before `app.use(\"/api/inngest\", serve({ client: inngest, functions: [generateContent] }))`. Without it, the POST/PUT sync request can fail even though a GET to the endpoint returns the dev page.\n2. **Wrong URL or port.** Point the Dev Server at your app explicitly: `npx inngest-cli@latest dev -u http://localhost:PORT/api/inngest` [2]. Use your Express port, not 3000 unless that's what you listen on. Auto-discovery only scans common ports.\n3. **Dev Server in Docker, or app in Docker.** `localhost` then points at the wrong machine. Use `http://host.docker.internal:PORT/api/inngest` [2].\n4. **Server errors during sync.** Look at your Express logs when you click sync. A thrown error, a body-size limit, or a proxy or middleware (auth, CORS, redirect) on `/api/inngest` will produce this same message.\n5. **Production mode.** If `NODE_ENV=production` or `INNGEST_DEV` isn't set, the SDK may try to run in cloud mode. Set `INNGEST_DEV=1` locally.\n\nSeparately, your function is fine. The trigger `{ event: \"generateContent\" }` is valid, though names like `app/generate.content` are conventional.",
+   "citations": [
+    {
+     "n": 2,
+     "title": "Get started",
+     "url": "https://www.inngest.com/docs/getting-started/index"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The docs don't list troubleshooting steps for the \"We could not reach your URL\" Dev Server sync error, such as the express.json() requirement and port or Docker mismatches.",
+   "whyUnsure": "Needs info from the user's account or logs: the Dev Server URL, Express port, and server logs during sync would pinpoint it."
+  },
+  "control": {
+   "text": "The most likely cause is **a missing `express.json()` body parser**. Inngest's Express handler needs the parsed JSON body for PUT (sync) and POST (invoke) requests. A GET to `/api/inngest` still responds, which is why the endpoint looks alive. The Dev Server's sync is a PUT, and it fails without the parser. Add this before the Inngest route:\n\n```ts\nimport express from \"express\";\nimport { serve } from \"inngest/express\";\n\nconst app = express();\napp.use(express.json()); // required, and must come before serve()\napp.use(\"/api/inngest\", serve({ client: inngest, functions: [generateContent] }));\n```\n\nIf you already have that, check these:\n\n1. **Port or host mismatch.** The Dev Server needs to reach the app's real URL, such as `http://localhost:3000/api/inngest`. If the app runs in Docker or WSL, or the Dev Server does, `localhost` won't resolve to the app. Use `host.docker.internal` or the container hostname instead. You can also start the Dev Server with `npx inngest-cli dev -u http://host:port/api/inngest`.\n2. **Body size limit.** Large payloads can fail with the default `express.json()` limit. Use `express.json({ limit: \"10mb\" })`.\n3. **Function signature (SDK v3+).** In v3 and later, the trigger goes inside the first argument: `createFunction({ id: \"generate-content\", triggers: [{ event: \"generateContent\" }] }, async ({ event, step }) => {...})`. The older three-argument form, where the trigger is the second argument, isn't valid in v4. If you're on v4, this alone would stop the function from registering properly.\n\nThe functions aren't recognized because the sync request never completes. The app never gets to return its function list to the Dev Server, so nothing is registered. Your server logs should show the actual error for the PUT request.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "The docs should say that a missing express.json() middleware causes the Dev Server's \"could not reach your URL\" sync error even though GET requests to the endpoint work.",
+   "whyUnsure": "Needs info from the user's account or logs: the server log error for the PUT sync request and the SDK version would confirm the cause."
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #2682",
+  "url": "https://github.com/orgs/inngest/discussions/2682",
+  "title": "How to implement webhook to inform user that background job has been completed?",
+  "created_at": "2025-07-14T01:51:10Z",
+  "question": "Hi, i have successfully implemented inngest in my web app to allow the job to handed off to be run in the background\r\n\r\nHowever, how can I notify my user in my frontend when the background job has been completed?\r\n\r\nAnyone has done a successful implementation of the inngest webhook to share the code snippet or can be point to some good resource for me to do my research on how to implement webhook to inform user that background job has been completed. Thanks a lot",
+  "gold_answer": "Staff suggested three options: use Inngest Realtime to push updates from the function to the browser, poll the run status through the REST API via a backend endpoint in your app, or add a final step.run that writes to your database or notification system to notify users.",
+  "gold_thread": "Hi @myhendry, Inngest has a couple options that you can use:\r\n\r\n* **Realtime** - Push updates to the browser from your function: https://www.inngest.com/docs/features/realtime\r\n* **REST API** - You can fetch the status of a run via the REST API. [Here's some guidance on make this request](https://www.inngest.com/docs/examples/fetch-run-status-and-output). This request would have to happen via your backend/API, so you could wrap this in an API endpoint in your application.\r\n\r\nAlternatively, you could add an extra `step.run` to interact with a database or notification system that you may already have set up to push an update to your users.",
+  "cleaned": {
+   "question": "How can I notify my frontend user when a background job run by Inngest has completed, such as by implementing a webhook or another mechanism? The job is already handed off to Inngest to run in the background in my web app, and I am looking for a code snippet or resource showing a working implementation.",
+   "queries": [
+    "Inngest notify frontend job completed",
+    "Inngest webhook function completion",
+    "Inngest realtime updates frontend",
+    "Inngest step.sendEvent completion"
+   ],
+   "codeTerms": [
+    "step.sendEvent",
+    "waitForEvent",
+    "inngest.send",
+    "step.run"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "Two good options:\n\n**1. Inngest Realtime (best for notifying a browser user).** In the v4 SDK it's built into `inngest`, with no extra package [1]. Define a typed channel and topic, `publish` from your function when the work finishes, and subscribe from the frontend. Use a per-user or per-job channel key, and mint a scoped subscription token on your server so the browser never sees your signing key. I'm not certain of the exact v4 helper names, so check the Realtime reference [1] for the channel, publish and subscribe signatures. There's also a working example in inngest-js under `examples/realtime/` [9]. That example uses the older v3 `publish` argument style.\n\n**2. Webhook/callback (best for server-to-server).** Pass a callback URL in the triggering event's data. As the last step of your function, POST to it in a `step.run` so it's retried and not duplicated [2]:\n\n```ts\nawait step.run(\"notify-complete\", async () => {\n  await fetch(event.data.callbackUrl, {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ jobId: event.data.jobId, status: \"done\" }),\n  });\n});\n```\n\nYour endpoint then pushes to the browser via SSE or WebSocket, or the frontend polls your DB for job status.\n\nAlternatively, finish the function by emitting a completion event with `step.sendEvent()` [3], which other functions can react to. That's not a direct browser notification, though.\n\nRealtime is the simplest option if the user is waiting on the page. Polling or a webhook is simpler if they may leave and come back.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Realtime",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/realtime/index"
+    },
+    {
+     "n": 2,
+     "title": "Delegate Tasks to Sub-Agents",
+     "url": "https://www.inngest.com/docs/ai-patterns/sub-agent-delegation"
+    },
+    {
+     "n": 3,
+     "title": "Send Event",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-send-event"
+    },
+    {
+     "n": 9,
+     "title": "Source code: inngest-js/examples/realtime/nodejs/realtime-human-in-the-loop/index.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/d3916895077b9c6eeb730ee1d910d78fe61e23fd/examples/realtime/nodejs/realtime-human-in-the-loop/index.ts#L55"
+    }
+   ],
+   "confidence": 0.6,
+   "docsGap": "A complete v4 end-to-end example of publishing from a function and subscribing from a React frontend with a server-minted token.",
+   "whyUnsure": "Docs only partly cover this: the sources don't show the v4 realtime publish/subscribe code."
+  },
+  "withDocs": {
+   "text": "Two good options:\n\n**1. Inngest Realtime (best for notifying a browser user).** In the v4 SDK it's built into `inngest`, with no extra package [1]. Define a typed channel and topic, `publish` from your function when the work finishes, and subscribe from the frontend. Use a per-user or per-job channel key, and mint a scoped subscription token on your server so the browser never sees your signing key. I'm not certain of the exact v4 helper names, so check the Realtime reference [1] for the channel, publish and subscribe signatures. There's also a working example in inngest-js under `examples/realtime/` [9]. That example uses the older v3 `publish` argument style.\n\n**2. Webhook/callback (best for server-to-server).** Pass a callback URL in the triggering event's data. As the last step of your function, POST to it in a `step.run` so it's retried and not duplicated [2]:\n\n```ts\nawait step.run(\"notify-complete\", async () => {\n  await fetch(event.data.callbackUrl, {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ jobId: event.data.jobId, status: \"done\" }),\n  });\n});\n```\n\nYour endpoint then pushes to the browser via SSE or WebSocket, or the frontend polls your DB for job status.\n\nAlternatively, finish the function by emitting a completion event with `step.sendEvent()` [3], which other functions can react to. That's not a direct browser notification, though.\n\nRealtime is the simplest option if the user is waiting on the page. Polling or a webhook is simpler if they may leave and come back.",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Realtime",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/realtime/index"
+    },
+    {
+     "n": 2,
+     "title": "Delegate Tasks to Sub-Agents",
+     "url": "https://www.inngest.com/docs/ai-patterns/sub-agent-delegation"
+    },
+    {
+     "n": 3,
+     "title": "Send Event",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-send-event"
+    },
+    {
+     "n": 9,
+     "title": "Source code: inngest-js/examples/realtime/nodejs/realtime-human-in-the-loop/index.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/d3916895077b9c6eeb730ee1d910d78fe61e23fd/examples/realtime/nodejs/realtime-human-in-the-loop/index.ts#L55"
+    }
+   ],
+   "confidence": 0.6,
+   "docsGap": "A complete v4 end-to-end example of publishing from a function and subscribing from a React frontend with a server-minted token.",
+   "whyUnsure": "Docs only partly cover this: the sources don't show the v4 realtime publish/subscribe code."
+  },
+  "control": {
+   "text": "Inngest doesn't push to your browser directly, so the usual pattern is: **the last step of your function notifies the client**, via a realtime channel or your own backend.\n\n**Option 1: Inngest Realtime (built in).** Publish from inside the function, and subscribe from the frontend with a token generated by your server. Publishing looks roughly like this (check the Realtime docs for the exact current API, which has changed across SDK versions):\n\n```ts\nimport { inngest } from \"./client\";\nimport { channel, topic } from \"@inngest/realtime\";\n\nexport const jobChannel = channel((userId: string) => `user:${userId}`)\n  .addTopic(topic(\"status\").type<{ message: string }>());\n\nexport const myJob = inngest.createFunction(\n  { id: \"my-job\" },\n  { event: \"app/job.requested\" },\n  async ({ event, step, publish }) => {\n    await step.run(\"do-work\", async () => { /* ... */ });\n    await publish(jobChannel(event.data.userId).status({ message: \"done\" }));\n  }\n);\n```\n\nThe frontend subscribes using a subscription token your backend creates (`getSubscriptionToken`) and a React hook such as `useInngestSubscription`.\n\n**Option 2: Your own mechanism (most portable).** Add a final `step.run` that does one of:\n- Updates a job row in your DB (`status = 'complete'`), and the frontend polls an endpoint or you push over SSE/WebSocket.\n- Calls a provider like Pusher, Ably, or Supabase Realtime, or your own WebSocket server, to push to the user.\n- Sends an email or push notification.\n\n**Option 3: Webhook to your own API.** A last step can `fetch` your endpoint, which then pushes to the client. Make it idempotent, because steps can retry.\n\nSimplest working start: store the status in your DB in the last step and poll from the client. Upgrade to Realtime when you want push.",
+   "citations": [],
+   "confidence": 0.6,
+   "docsGap": "No sources were provided, so the Realtime API details (publish signature, token helper, React hook) were not checked against current docs.",
+   "whyUnsure": null
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #783",
+  "url": "https://github.com/orgs/inngest/discussions/783",
+  "title": "Can you nest steps in a function?",
+  "created_at": "2023-10-30T13:50:26Z",
+  "question": "Is nested steps possible and are they memoized? \r\n\r\nWould the below cause any issues or does the framework work with the below?  \r\n\r\n```\r\nexport default inngest.createFunction(\r\n  { id: \"activation-email\" },\r\n  { event: \"app/user.created\" },\r\n  async ({ event, step }) => {\r\n    await step.run(\"send-welcome-email\", async () => {\r\n       await step.run(\"do something\", async () => { do something });\r\n       await step.run(\"do something else\", async () => { do something else });\r\n      return await sendEmail({ email: event.user.email, template: \"welcome\" });\r\n    });\r\n\r\n...\r\n```\r\n\r\nrelated to: https://github.com/orgs/inngest/discussions/586#discussioncomment-7424313",
+  "gold_answer": "Inngest doesn't support nesting steps (calling step.run inside step.run). Group related steps with a regular async function that calls step.run sequentially, or run the sub-steps as a separate function via step.invoke.",
+  "gold_thread": "We currently don't support nesting steps, @ShravanSunder.\r\n\r\nYou can still group sets of steps together using a regular async function:\r\n\r\n```ts\r\nexport default inngest.createFunction(\r\n  { id: \"activation-email\" },\r\n  { event: \"app/user.created\" },\r\n  async ({ event, step }) => {\r\n    const sendWelcomeEmail = async () => {\r\n      await step.run(\"do something\", async () => { /* do something */ });\r\n      await step.run(\"do something else\", async () => { /* do something else */ });\r\n\r\n      return await step.run(\"send-welcome-email\", async () =>\r\n        sendEmail({ email: event.user.email, template: \"welcome\" }),\r\n      );\r\n    };\r\n\r\n    await sendWelcomeEmail();\r\n  },\r\n);\r\n```\r\n\r\nWhat would be your use case for nesting steps? 🙂 ",
+  "cleaned": {
+   "question": "Can steps be nested inside another step in an Inngest function, and are nested steps memoized? The developer asks whether this pattern works: an outer step.run(\"send-welcome-email\") that contains inner step.run(\"do something\") and step.run(\"do something else\") calls before returning sendEmail(...), inside an inngest.createFunction with id \"activation-email\" triggered by \"app/user.created\". The SDK, language, and version were not specified.",
+   "queries": [
+    "nested step.run inside step.run",
+    "Inngest step memoization nested steps",
+    "step.run within step.run discussion"
+   ],
+   "codeTerms": [
+    "step.run",
+    "createFunction",
+    "app/user.created",
+    "sendEmail"
+   ]
+  },
+  "nSources": 10,
+  "firstDraft": {
+   "text": "No, nesting `step.run` inside another `step.run` isn't supported in the TypeScript SDK. Each `step.run` is a unit of work that Inngest executes, retries and memoizes on its own, and its result is stored by its ID [3]. Calling `step.*` inside a step handler means a step is running within a step. That breaks the model, and the inner steps won't be memoized the way you expect. Expect an error or odd behavior, not nested memoization.\n\nMake the steps siblings at the function's top level instead:\n\n```ts\nexport default inngest.createFunction(\n  { id: \"activation-email\" },\n  { event: \"app/user.created\" },\n  async ({ event, step }) => {\n    await step.run(\"do-something\", () => doSomething());\n    await step.run(\"do-something-else\", () => doSomethingElse());\n    await step.run(\"send-welcome-email\", () =>\n      sendEmail({ email: event.user.email, template: \"welcome\" })\n    );\n  }\n);\n```\n\nEach step is memoized separately. If the email send fails and retries, the first two steps don't re-run. Use unique step IDs. If the inner pieces are plain helper code and not separate durable units, call them as ordinary functions inside the one step.\n\nAlso, `event.user.email` in the older docs example [10] should be `event.data.email` or similar. The payload lives under `event.data`.",
+   "citations": [
+    {
+     "n": 3,
+     "title": "Run",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-run"
+    },
+    {
+     "n": 10,
+     "title": "Source code: inngest/pages/docs/functions/multi-step.mdx",
+     "url": "https://github.com/inngest/inngest/blob/54a338d3858f5ad47ccca0eafada0260ae605c9e/pages/docs/functions/multi-step.mdx#L19"
+    }
+   ],
+   "confidence": 0.8,
+   "docsGap": "The provided sources don't explicitly state that nesting step.run inside step.run is unsupported or what error it produces.",
+   "whyUnsure": null
+  },
+  "withDocs": {
+   "text": "No, nesting `step.run` inside another `step.run` isn't supported in the TypeScript SDK. Each `step.run` is a unit of work that Inngest executes, retries and memoizes on its own, and its result is stored by its ID [3]. Calling `step.*` inside a step handler means a step is running within a step. That breaks the model, and the inner steps won't be memoized the way you expect. Expect an error or odd behavior, not nested memoization.\n\nMake the steps siblings at the function's top level instead:\n\n```ts\nexport default inngest.createFunction(\n  { id: \"activation-email\" },\n  { event: \"app/user.created\" },\n  async ({ event, step }) => {\n    await step.run(\"do-something\", () => doSomething());\n    await step.run(\"do-something-else\", () => doSomethingElse());\n    await step.run(\"send-welcome-email\", () =>\n      sendEmail({ email: event.user.email, template: \"welcome\" })\n    );\n  }\n);\n```\n\nEach step is memoized separately. If the email send fails and retries, the first two steps don't re-run. Use unique step IDs. If the inner pieces are plain helper code and not separate durable units, call them as ordinary functions inside the one step.\n\nAlso, `event.user.email` in the older docs example [10] should be `event.data.email` or similar. The payload lives under `event.data`.",
+   "citations": [
+    {
+     "n": 3,
+     "title": "Run",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/functions/step-run"
+    },
+    {
+     "n": 10,
+     "title": "Source code: inngest/pages/docs/functions/multi-step.mdx",
+     "url": "https://github.com/inngest/inngest/blob/54a338d3858f5ad47ccca0eafada0260ae605c9e/pages/docs/functions/multi-step.mdx#L19"
+    }
+   ],
+   "confidence": 0.8,
+   "docsGap": "The provided sources don't explicitly state that nesting step.run inside step.run is unsupported or what error it produces.",
+   "whyUnsure": null
+  },
+  "control": {
+   "text": "No, nesting `step.run` inside another `step.run` isn't supported in Inngest. Each step is an independently executed and memoized unit, and the SDK doesn't allow creating steps from within a step's callback. Depending on the SDK version, you'll get an error or undefined behavior (in the TypeScript SDK, a nested step tooling error like \"Your function is attempting to run a step inside another step\").\n\nFix: make the steps siblings and return the result from the last one:\n\n```ts\ninngest.createFunction(\n  { id: \"activation-email\" },\n  { event: \"app/user.created\" },\n  async ({ event, step }) => {\n    await step.run(\"do-something\", async () => { /* ... */ });\n    await step.run(\"do-something-else\", async () => { /* ... */ });\n    await step.run(\"send-welcome-email\", () => sendEmail(event.data.email));\n  }\n);\n```\n\nEach top-level step is memoized: once it succeeds, its result is saved and it isn't re-executed on later invocations of the function. Retries only rerun the failing step. If you need to group logic, use a plain helper function that is called inside one step (no `step.*` calls inside), or put the sequence at the function level. If the steps need to run in parallel, use `Promise.all([...])` over top-level steps.",
+   "citations": [],
+   "confidence": 0.85,
+   "docsGap": null,
+   "whyUnsure": null
+  }
+ },
+ {
+  "source": "inngest/inngest discussion #989",
+  "url": "https://github.com/orgs/inngest/discussions/989",
+  "title": "How could I add an instance of logger to the async context?",
+  "created_at": "2024-01-08T18:13:13Z",
+  "question": "I use a custom logging utility within my codebase. It would be pretty hard to rewrite the entire codebase to interop with Inngest logger. What I would like to do instead is inject the logger into the [async context](https://nodejs.org/api/async_context.html) and check inside my logger if that logger is available.\r\n\r\n```ts\r\nconst { AsyncLocalStorage } = require('node:async_hooks');\r\n\r\nconst myLog = () => {\r\n  const inngestLogger = asyncLocalStorage.getStore();\r\n\r\n  if (inngestLogger) {\r\n    // use Inngest logger\r\n  } else {\r\n    // use my own logger\r\n  }\r\n};\r\n```\r\n\r\nI need this logger to be injected at a start of every function execution. What's the best way to do it?\r\n\r\n---\r\n\r\nI tried writing a middleware, but it does not seem like the logger is available:\r\n\r\n```ts\r\nexport const logMiddleware = new InngestMiddleware({\r\n  init({ client }) {\r\n    return {\r\n      onFunctionRun(args) {\r\n        console.log('onFunctionRun', typeof args.logger);\r\n\r\n        return {\r\n          afterExecution() {\r\n            console.log('afterExecution');\r\n          },\r\n          beforeExecution(...args) {\r\n            console.log('beforeExecution', typeof args.logger);\r\n          },\r\n        };\r\n      },\r\n    };\r\n  },\r\n  name: 'Logger ALS Middleware',\r\n});\r\n\r\n```\r\n\r\nProduces:\r\n\r\n```\r\nonFunctionRun undefined\r\nbeforeExecution undefined\r\n```\r\n\r\n---\r\n\r\nIn principal this works, just need to figure out how to get a reference to the logger. CC @djfarrelly @IGassmann @jpwilliams ",
+  "gold_answer": "Get the logger from the function's context in the middleware's transformInput() hook (ctx.logger) inside onFunctionRun, because the built-in logger is internally middleware and its types aren't exposed to userland middleware. Store it in AsyncLocalStorage in beforeExecution and remove it in afterExecution.",
+  "gold_thread": "Regarding using middleware, you can access the function's arguments (and therefore the logger) with the `transformInput()` hook, e.g.:\r\n```ts\r\nexport const logMiddleware = new InngestMiddleware({\r\n  init() {\r\n    return {\r\n      onFunctionRun() {\r\n        return {\r\n          transformInput({ ctx }) {\r\n            // `ctx.logger` is the logger\r\n          },\r\n        };\r\n      },\r\n    };\r\n  },\r\n  name: \"Logger ALS Middleware\",\r\n});\r\n```\r\nI'd probably then use the `afterExecution()` hook (as it looks like you're doing) to remove it from your async hooks store.\r\n\r\nThe likely cause of some confusion is that the `logger` is, internally, also middleware, so the types for it aren't shown in userland middleware. 🙄 There's an old PR inngest/inngest-js#332 that resolves this. I'll look at pulling that in to make this path a bit more obvious in the future.",
+  "cleaned": {
+   "question": "How can I make the Inngest function logger available through Node.js AsyncLocalStorage at the start of every function execution, so my custom logging utility can detect and use it? An InngestMiddleware using onFunctionRun and beforeExecution logs typeof args.logger as undefined, so I can't get a reference to the logger there.",
+   "queries": [
+    "inngest middleware logger access",
+    "inngest onFunctionRun middleware context",
+    "inngest custom logger injection"
+   ],
+   "codeTerms": [
+    "InngestMiddleware",
+    "onFunctionRun",
+    "beforeExecution",
+    "AsyncLocalStorage"
+   ]
+  },
+  "nSources": 9,
+  "firstDraft": {
+   "text": "`logger` isn't passed to `beforeExecution`. In v3-style middleware, `onFunctionRun` hooks get `{ ctx, fn, steps, reqArgs }` and `beforeExecution` takes no args [8]. The logger lives on the function input `ctx`, which you can only get in `transformInput`. Use that hook instead of `beforeExecution`.\n\nThe catch is that `transformInput` returns the input rather than wrapping the handler. So you can't wrap the user's function in `als.run()` there. Two workable options:\n\n1. **Call `als.enterWith(...)` in `transformInput`.** It sets the store for the current async context, and the user function runs afterwards in that same chain. This is the simplest approach, but I haven't verified it against every execution path.\n\n```ts\nconst als = new AsyncLocalStorage<Logger>();\n\nnew InngestMiddleware({\n  name: \"logger-als\",\n  init: () => ({\n    onFunctionRun: () => ({\n      transformInput: ({ ctx }) => {\n        als.enterWith(ctx.logger);\n        return {};\n      },\n    }),\n  }),\n});\n```\n\n2. **Use v4 middleware.** There you extend `Middleware.BaseMiddleware`. `transformFunctionInput` receives `args.ctx`, so the logger is available there [1][2]. v4 also has wrapping hooks like `wrapRequest`, which may let you run inside `als.run()`. Check the lifecycle reference for the exact hook that wraps function execution [2].\n\nIf you only need a custom logger everywhere, you can also pass your own `logger` to the `Inngest` client. It's then used as `ctx.logger` [3][4].",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Middleware examples",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/examples"
+    },
+    {
+     "n": 2,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 3,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 4,
+     "title": "Logging",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/logging"
+    },
+    {
+     "n": 8,
+     "title": "Source code: inngest-js/packages/inngest/src/components/execution/v0.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/a97c0e599f843836380b8defdd1e2ee158059e82/packages/inngest/src/components/execution/v0.ts#L33"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The middleware docs don't show how to expose ctx.logger via AsyncLocalStorage or which hook wraps user function execution.",
+   "whyUnsure": "Docs only partly cover this: no documented pattern for AsyncLocalStorage, and v3 vs v4 hook details are unverified."
+  },
+  "withDocs": {
+   "text": "`logger` isn't passed to `beforeExecution`. In v3-style middleware, `onFunctionRun` hooks get `{ ctx, fn, steps, reqArgs }` and `beforeExecution` takes no args [8]. The logger lives on the function input `ctx`, which you can only get in `transformInput`. Use that hook instead of `beforeExecution`.\n\nThe catch is that `transformInput` returns the input rather than wrapping the handler. So you can't wrap the user's function in `als.run()` there. Two workable options:\n\n1. **Call `als.enterWith(...)` in `transformInput`.** It sets the store for the current async context, and the user function runs afterwards in that same chain. This is the simplest approach, but I haven't verified it against every execution path.\n\n```ts\nconst als = new AsyncLocalStorage<Logger>();\n\nnew InngestMiddleware({\n  name: \"logger-als\",\n  init: () => ({\n    onFunctionRun: () => ({\n      transformInput: ({ ctx }) => {\n        als.enterWith(ctx.logger);\n        return {};\n      },\n    }),\n  }),\n});\n```\n\n2. **Use v4 middleware.** There you extend `Middleware.BaseMiddleware`. `transformFunctionInput` receives `args.ctx`, so the logger is available there [1][2]. v4 also has wrapping hooks like `wrapRequest`, which may let you run inside `als.run()`. Check the lifecycle reference for the exact hook that wraps function execution [2].\n\nIf you only need a custom logger everywhere, you can also pass your own `logger` to the `Inngest` client. It's then used as `ctx.logger` [3][4].",
+   "citations": [
+    {
+     "n": 1,
+     "title": "Middleware examples",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/examples"
+    },
+    {
+     "n": 2,
+     "title": "Middleware lifecycle",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/middleware/lifecycle"
+    },
+    {
+     "n": 3,
+     "title": "Logging in Inngest",
+     "url": "https://www.inngest.com/docs/guides/logging"
+    },
+    {
+     "n": 4,
+     "title": "Logging",
+     "url": "https://www.inngest.com/docs/reference/typescript/v4/logging"
+    },
+    {
+     "n": 8,
+     "title": "Source code: inngest-js/packages/inngest/src/components/execution/v0.ts",
+     "url": "https://github.com/inngest/inngest-js/blob/a97c0e599f843836380b8defdd1e2ee158059e82/packages/inngest/src/components/execution/v0.ts#L33"
+    }
+   ],
+   "confidence": 0.55,
+   "docsGap": "The middleware docs don't show how to expose ctx.logger via AsyncLocalStorage or which hook wraps user function execution.",
+   "whyUnsure": "Docs only partly cover this: no documented pattern for AsyncLocalStorage, and v3 vs v4 hook details are unverified."
+  },
+  "control": {
+   "text": "`args.logger` is undefined because `beforeExecution` doesn't receive the function context. The logger is on `ctx`, which you get in the `transformInput` hook of `onFunctionRun`.\n\n```ts\nimport { AsyncLocalStorage } from \"node:async_hooks\";\n\nexport const loggerStore = new AsyncLocalStorage<{ logger: Logger }>();\n\nnew InngestMiddleware({\n  name: \"als-logger\",\n  init() {\n    return {\n      onFunctionRun() {\n        return {\n          transformInput({ ctx }) {\n            loggerStore.enterWith({ logger: ctx.logger });\n          },\n          // beforeExecution() takes no args, so ctx.logger isn't available here\n        };\n      },\n    };\n  },\n});\n```\n\nCaveats:\n- Middleware hooks run before or after your handler. They don't wrap it, so there's no `als.run(store, () => handler())` option. `enterWith` is the closest option, and it can be flaky. If the store doesn't reach your handler, `enterWith` is losing the context across an `await`.\n- The most reliable fix is to wrap the handler yourself:\n  ```ts\n  const withLogger = (fn) => (ctx) => loggerStore.run({ logger: ctx.logger }, () => fn(ctx));\n  inngest.createFunction({ id: \"x\" }, { event: \"e\" }, withLogger(async (ctx) => { ... }));\n  ```\n- Step code that re-runs on later requests gets a fresh store each time, which is what you want. Don't cache the logger across invocations.\n- Alternatively, pass the same logger you give to `new Inngest({ logger })` to your utility directly. `ctx.logger` is that logger, plus Inngest's flushing behavior.\n\nI'm answering from memory of the v3 middleware API, so check the hook signatures against your SDK version.",
+   "citations": [],
+   "confidence": 0.55,
+   "docsGap": "The middleware docs don't say which hooks receive ctx.logger or how to propagate it via AsyncLocalStorage.",
+   "whyUnsure": "No doc or past fix matched this: ALS propagation via enterWith in middleware is unverified"
+  }
+ }
+]
